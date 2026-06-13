@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# רדיוס (Radius) — מערכת חיתום והערכת מכרזים ליזמי נדל״ן
 
-## Getting Started
+מערכת SaaS בעברית (RTL) להערכת כדאיות מכרזי קרקע ועסקאות נדל״ן בישראל. בלִבּה **מנוע חיתום (Residual Land Value)** עם **סימולציית מונטה-קרלו**, **גילוי עלויות נסתרות**, **הדמיית מסה תלת-ממדית על מפה אמיתית**, ו**אנליסט AI**.
 
-First, run the development server:
+> נבנתה לענות על הכאב העמוק ביותר של יזמים: *איפה הכסף נשרף* — קללת המנצח, היטל השבחה, אגרות, פערי זכויות, וסיכון לו״ז/מימון.
+
+## מה המערכת פותרת
+
+| כאב | הפתרון במערכת |
+|-----|----------------|
+| **קללת המנצח** — תשלום-יתר במכרז | מד הצעה עם "מחיר רצפה", "הצעה מומלצת" ו"סף קללת מנצח" |
+| **עלויות נסתרות** | מחשבון אוטומטי: היטל השבחה, אגרות והיטלי פיתוח לפי עיר, פיתוח רמ״י, מס רכישה, מימון |
+| **פער זכויות** | מנוע זכויות: מהזכויות התכנוניות לשטח מכיר בפועל |
+| **אי-ודאות** | מונטה-קרלו (אלפי תרחישים) → התפלגות רווח והסתברות הפסד |
+| **החלטה** | הכרעת Go/No-Go + ניתוח AI + דוח להדפסה |
+
+## הרצה מהירה
+
+דרושות שלוש פקודות (שלושה טרמינלים), או DB משלכם דרך `MONGODB_URI`.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run db      # טרמינל 1 — MongoDB מקומי מתמיד (מוריד בינארי בפעם הראשונה)
+npm run seed    # פעם אחת — מזריע ערים, עסקאות, מכרזים ו-3 פרויקטים
+npm run dev     # טרמינל 2 — http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+התחברות דמו: **demo@radius.co.il / radius2026** (ממולא מראש).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### משתני סביבה (`.env.local`)
+```
+ANTHROPIC_API_KEY=...        # לפיצ'רי ה-AI
+MONGODB_URI=mongodb://127.0.0.1:27017/michrazim
+AUTH_SECRET=...
+NEXT_PUBLIC_MAPBOX_TOKEN=    # ריק = MapLibre חינם; הדביקו token לשדרוג ל-Mapbox
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## ה-Stack
+- **Next.js 16 (App Router) + React 19 + TypeScript**
+- **MongoDB + Mongoose** (DB מקומי מתמיד דרך `mongodb-memory-server`)
+- **Tailwind v4 + shadcn-style UI + Framer Motion** — RTL, dark+light
+- **MapLibre GL / Mapbox** + בסיס CARTO — מפה תלת-ממדית והדמיית מסה
+- **Recharts** — התפלגות, tornado, תזרים, מפל עלויות
+- **Anthropic SDK** — אנליסט סיכונים, שו״ת, פרסור מכרז, דוח
+- **Vitest** (מנוע) + **Playwright** (e2e)
 
-## Learn More
+## ארכיטקטורה
+```
+src/
+├─ lib/engine/      מנוע חיתום pure-TS (נבדק) — RLV, מונטה-קרלו, מימון, רגישות
+├─ lib/data/        adapters ל-APIs ממשלתיים (data.gov.il, govmap, nadlan) + fallback
+├─ lib/ai/          Anthropic — ניתוח, שו״ת, דוח, פרסור מכרז
+├─ server/          Mongoose models, queries, server actions, auth (JWT)
+├─ app/             דפים (RTL): login, dashboard, projects/[id], wizard, map, report
+└─ components/      map (3D), charts, wizard, ai, ui
+```
 
-To learn more about Next.js, take a look at the following resources:
+### מקורות נתונים — מה חי ומה seed
+- ✅ **מכרזי רמ״י ותכניות** — **חי** מ-data.gov.il: "עלויות פיתוח בבנייה העירונית" (~1,500 פרויקטים, כולל "במכרז") + "מלאי תכנוני למגורים" (~1,100 תכניות). כולל עלויות פיתוח אמיתיות וקישורים ל-land.gov.il. (`src/lib/data/rmi.ts`)
+- ✅ **גבולות גוש-חלקה** — **חי** מ-govmap WFS (EPSG:3857 → WGS84), נשלף בצד-לקוח ומשתדרג מ-synth לחלקה אמיתית. (`src/lib/data/govmap.ts`, `/api/parcel`)
+- ✅ **אריחי מפה** — CARTO/OSM אמיתיים, ללא token.
+- ✅ **AI** — Anthropic API אמיתי (ניתוח, שו״ת, עוזר, פרסור, דוח).
+- ⚠️ **עסקאות השוואה** — seed ריאליסטי (nadlan.gov.il חוסם גישה תכנותית; ה-adapter קיים ב-`src/lib/data/nadlan.ts` עם fallback).
+- ⚠️ **טבלאות אגרות עירוניות** — מייצגות לפי טווחי חוקי עזר (להחלפה במאגר מעודכן).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+> **Mapbox:** המפה רצה על MapLibre/CARTO חינם. טוקן Mapbox מסוג `sk.` (סודי) **אינו** משמש בדפדפן מטעמי אבטחה — לשדרוג ל-Mapbox ספקו טוקן ציבורי (`pk.`) ב-`NEXT_PUBLIC_MAPBOX_TOKEN`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## בדיקות
+```bash
+npm run test       # Vitest — 12 בדיקות מנוע (RLV, מונטה-קרלו, מימון, זכויות)
+npm run test:e2e   # Playwright — smoke מקצה-לקצה (דורש db+dev רצים)
+npm run build      # build פרודקשן מלא
+```
 
-## Deploy on Vercel
+## מנוע החישוב (הלב)
+`שווי קרקע שיורי = הכנסות − בנייה − עלויות רכות − (אגרות + היטל השבחה + פיתוח) − מימון − שיווק − מס רכישה − רווח יזמי נדרש`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+כל קלט הוא **התפלגות**; מונטה-קרלו מייצר התפלגות רווח, הסתברות הפסד, ומחיר הצעה ממושמע. ראו `src/lib/engine/`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## הערת אבטחה
+מפתח ה-Anthropic נשמר ב-`.env.local` (ב-`.gitignore`) בלבד. החליפו אותו לפני פריסה ציבורית.
+
+---
+*כלי תומך-החלטה — אינו מהווה ייעוץ שמאי, משפטי או פיננסי.*

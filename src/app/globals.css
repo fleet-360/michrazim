@@ -1,26 +1,268 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
+/* ===========================================================================
+   Omdan design system — light & dark. Premium financial / proptech aesthetic.
+   =========================================================================== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: 210 40% 99%;
+  --foreground: 222 47% 11%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+
+  --primary: 231 64% 52%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 220 16% 95%;
+  --secondary-foreground: 222 47% 16%;
+
+  --muted: 220 16% 96%;
+  --muted-foreground: 220 12% 42%;
+
+  --accent: 35 82% 50%;
+  --accent-foreground: 28 80% 14%;
+
+  --success: 158 64% 36%;
+  --success-foreground: 0 0% 100%;
+  --warning: 36 88% 40%;
+  --warning-foreground: 28 80% 12%;
+  --danger: 0 72% 48%;
+  --danger-foreground: 0 0% 100%;
+
+  --border: 220 16% 90%;
+  --input: 220 16% 90%;
+  --ring: 231 64% 52%;
+
+  --chart-1: 231 64% 55%;
+  --chart-2: 38 92% 50%;
+  --chart-3: 158 64% 42%;
+  --chart-4: 280 60% 58%;
+  --chart-5: 199 80% 48%;
+  --chart-6: 340 75% 55%;
+
+  --radius: 0.85rem;
+}
+
+.dark {
+  --background: 224 47% 6%;
+  --foreground: 210 40% 96%;
+
+  --card: 223 43% 9%;
+  --card-foreground: 210 40% 96%;
+  --popover: 223 47% 8%;
+  --popover-foreground: 210 40% 96%;
+
+  --primary: 231 75% 66%;
+  --primary-foreground: 224 47% 8%;
+
+  --secondary: 223 30% 15%;
+  --secondary-foreground: 210 40% 92%;
+
+  --muted: 223 28% 14%;
+  --muted-foreground: 217 18% 62%;
+
+  --accent: 36 86% 56%;
+  --accent-foreground: 28 80% 10%;
+
+  --success: 158 60% 48%;
+  --success-foreground: 224 47% 8%;
+  --warning: 38 95% 56%;
+  --warning-foreground: 28 80% 10%;
+  --danger: 0 72% 58%;
+  --danger-foreground: 0 0% 100%;
+
+  --border: 223 25% 18%;
+  --input: 223 25% 20%;
+  --ring: 231 75% 66%;
+
+  --chart-1: 231 75% 68%;
+  --chart-2: 38 95% 58%;
+  --chart-3: 158 64% 52%;
+  --chart-4: 280 70% 70%;
+  --chart-5: 199 85% 58%;
+  --chart-6: 340 80% 66%;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-danger: hsl(var(--danger));
+  --color-danger-foreground: hsl(var(--danger-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+  --color-chart-6: hsl(var(--chart-6));
+
+  --font-sans: var(--font-noto-sans), system-ui, sans-serif;
+  --font-display: var(--font-noto-serif), var(--font-noto-sans), Georgia, serif;
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 0.25rem);
+  --radius-sm: calc(var(--radius) - 0.4rem);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ambient gradient backdrop for the app shell */
+.app-aurora {
+  background-image:
+    radial-gradient(60rem 60rem at 85% -10%, hsl(var(--primary) / 0.10), transparent 60%),
+    radial-gradient(50rem 50rem at 0% 0%, hsl(var(--accent) / 0.08), transparent 55%);
+}
+
+.glass {
+  background: hsl(var(--card) / 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.card-surface {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-lg);
+}
+
+/* Numeric tabular figures for money/tables — never wrap a figure mid-value */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  white-space: nowrap;
+}
+
+/* Display headings — Frank Ruhl Libre serif, refined tracking & rhythm */
+.font-display {
+  letter-spacing: -0.003em;
+  font-feature-settings: "kern" 1;
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
+/* Premium soft shadow for elevated surfaces */
+.shadow-premium {
+  box-shadow:
+    0 1px 2px hsl(222 47% 8% / 0.06),
+    0 8px 24px -12px hsl(222 47% 8% / 0.18);
+}
+.dark .shadow-premium {
+  box-shadow:
+    0 1px 2px hsl(0 0% 0% / 0.4),
+    0 12px 32px -16px hsl(0 0% 0% / 0.6);
+}
+
+/* Hairline gradient divider used in premium headers */
+.rule-gradient {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, hsl(var(--border)), transparent);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+.maplibregl-ctrl-attrib,
+.mapboxgl-ctrl-attrib {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.06), transparent);
+  animation: shimmer 1.6s infinite;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  /* Force a clean, light document regardless of the active theme */
+  :root,
+  .dark {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --muted: 220 16% 96%;
+    --muted-foreground: 220 14% 38%;
+    --border: 220 16% 84%;
+    --primary: 231 64% 48%;
+    --accent: 35 82% 42%;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body {
+    background: white !important;
+  }
+  .card-surface,
+  [class*="bg-card"] {
+    box-shadow: none !important;
+  }
+  /* avoid awkward page breaks inside cards/sections */
+  section,
+  .break-avoid {
+    break-inside: avoid;
+  }
 }

@@ -36,6 +36,14 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local mongo data + test artifacts
+/.mongo-data
+/test-results
+/playwright-report
+/playwright/.cache
+/screenshots
+.mongodb-binaries
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

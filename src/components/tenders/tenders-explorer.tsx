@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Search, ExternalLink, Loader2, ArrowUpLeft, MapPin, Building, FileSpreadsheet } from "lucide-react";
 import { downloadXlsx } from "@/lib/export";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,15 @@ const STATUS_FILTERS = [
   { key: "plan", label: "בתכנון" },
 ];
 
-export function TendersExplorer({ tenders, live }: { tenders: RmiTender[]; live: boolean }) {
+export function TendersExplorer({
+  tenders,
+  live,
+  totalAvailable,
+}: {
+  tenders: RmiTender[];
+  live: boolean;
+  totalAvailable?: number;
+}) {
   const [q, setQ] = React.useState("");
   const [filter, setFilter] = React.useState("all");
   const [importing, setImporting] = React.useState<string | null>(null);
@@ -40,7 +48,6 @@ export function TendersExplorer({ tenders, live }: { tenders: RmiTender[]; live:
         city: t.city,
         units: t.units,
         totalDevelopCost: t.totalDevelopCost,
-        developPayPerUnit: t.developPayPerUnit,
       });
     } catch {
       setImporting(null);
@@ -94,8 +101,13 @@ export function TendersExplorer({ tenders, live }: { tenders: RmiTender[]; live:
       </div>
 
       <div className="text-sm text-muted-foreground">
-        מציג {formatNumber(filtered.length)} מתוך {formatNumber(tenders.length)} רשומות
-        {live && <span className="text-success"> · נתונים חיים מ-data.gov.il (רמ״י)</span>}
+        מציג {formatNumber(filtered.length)} מתוך {formatNumber(tenders.length)} שנטענו
+        {totalAvailable ? (
+          <>
+            {" "}· מתוך <b className="text-foreground">{formatNumber(totalAvailable)}</b> פרויקטי רמ״י במאגר
+          </>
+        ) : null}
+        {live && <span className="text-success"> · נתונים חיים מ-data.gov.il</span>}
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

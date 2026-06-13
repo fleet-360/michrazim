@@ -1,6 +1,11 @@
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/michrazim";
+// The database name is pinned here, not taken from the connection string. Atlas /
+// Vercel-generated SRV strings often omit the path (…mongodb.net/?retryWrites=…),
+// which would otherwise silently land us in the default "test" DB. Passing dbName
+// to mongoose.connect() forces the right database regardless of the URI's path.
+const DB_NAME = process.env.MONGODB_DB || "michrazim";
+const MONGODB_URI = process.env.MONGODB_URI || `mongodb://127.0.0.1:27017/${DB_NAME}`;
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -16,6 +21,7 @@ export async function connectDB(): Promise<typeof mongoose> {
   if (cache.conn) return cache.conn;
   if (!cache.promise) {
     cache.promise = mongoose.connect(MONGODB_URI, {
+      dbName: DB_NAME,
       bufferCommands: false,
       serverSelectionTimeoutMS: 5000,
     });

@@ -18,7 +18,6 @@ export interface RmiTender {
   units: number;
   status: string;
   tenderDate?: string;
-  developPayPerUnit?: number;
   totalDevelopCost?: number;
   oldByNewCost?: number;
   lat?: number;
@@ -32,6 +31,33 @@ export interface RmiTender {
 // --- simple in-memory cache (server runtime) ---
 const cache = new Map<string, { at: number; data: RmiTender[] }>();
 const TTL = 1000 * 60 * 30;
+
+let totalsCache: { at: number; data: RmiTotals } | null = null;
+export interface RmiTotals {
+  total: number;
+  inTender: number;
+  planning: number;
+  live: boolean;
+}
+
+/** Real record counts from CKAN (cheap — reads dataset totals, not the rows). */
+export async function getRmiTotals(): Promise<RmiTotals> {
+  if (totalsCache && Date.now() - totalsCache.at < TTL) return totalsCache.data;
+  const count = async (resourceId: string) => {
+    const json = await safeJson<{ success: boolean; result: { total: number } }>(
+      `${CKAN}?resource_id=${resourceId}&limit=0`,
+      { timeoutMs: 8000 },
+    );
+    return json?.success ? json.result.total : null;
+  };
+  const [dev, plan] = await Promise.all([count(RES_DEVCOSTS), count(RES_PLANNING)]);
+  const data: RmiTotals =
+    dev == null && plan == null
+      ? { total: FALLBACK.length, inTender: FALLBACK.length, planning: 0, live: false }
+      : { inTender: dev ?? 0, planning: plan ?? 0, total: (dev ?? 0) + (plan ?? 0), live: true };
+  totalsCache = { at: Date.now(), data };
+  return data;
+}
 
 function num(v: unknown): number {
   if (typeof v === "number") return v;
@@ -58,8 +84,9 @@ function normalizeDevCost(r: Record<string, unknown>): RmiTender {
     units,
     status: s(r["StatusDescription"]) || "—",
     tenderDate: s(r["TenderIndexDate"]),
-    developPayPerUnit: pay,
-    totalDevelopCost: num(r["TenderDevPay"]) || pay * Math.max(1, units),
+    // DevelopPay / TenderDevPay are PROJECT TOTALS (not per-unit). TenderDevPay
+    // is the indexed tender figure the developer actually pays; DevelopPay is the base.
+    totalDevelopCost: num(r["TenderDevPay"]) || pay,
     oldByNewCost: num(r["OldByNewCost"]),
     lat: geo?.lat,
     lng: geo?.lng,

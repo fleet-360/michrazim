@@ -55,7 +55,7 @@ export default async function LoginPage() {
         </div>
 
         <div className="relative text-sm text-white/60">
-          נתוני רמ״י, רשות המיסים ו-GIS ממשלתי · סימולציית מונטה-קרלo · ניתוח AI
+          נתוני רמ״י, רשות המיסים ו-GIS ממשלתי · סימולציית מונטה-קרלו · ניתוח AI
         </div>
       </div>
 

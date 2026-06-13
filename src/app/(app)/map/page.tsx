@@ -40,7 +40,7 @@ export default async function MapPage() {
       <div>
         <h1 className="font-display text-2xl font-bold tracking-tight">מפת מכרזים ופרויקטים</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          כל העסקאות והמכרזים הפתוחים על מפה אחת — לחצו על פרויקט לניתוח מלא
+          מכרזי רמ״י פתוחים והפרויקטים שלכם על מפה אחת — לחצו על פרויקט לניתוח מלא
         </p>
       </div>
 

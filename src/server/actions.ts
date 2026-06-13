@@ -227,7 +227,6 @@ export interface ImportTenderInput {
   city: string;
   units: number;
   totalDevelopCost?: number;
-  developPayPerUnit?: number;
 }
 
 /** Create a fully-analyzable project from a live RMI tender (real dev costs). */
@@ -239,12 +238,21 @@ export async function importTenderAction(t: ImportTenderInput) {
   const avgPrice = cityRow?.avgResidentialPricePerSqm ?? 26000;
 
   const units = Math.max(8, t.units || 60);
-  // estimate plot area from units (far 3.0, efficiency 0.82, avg unit 92 m²)
-  const plotAreaSqm = Math.round((units * 92) / (3.0 * 0.82));
+  // Reverse-engineer a plot area that makes the rights engine reproduce the tender's
+  // stated unit count exactly, so the project card matches the source tender (no 255→242
+  // surprise). Mirrors buildInputsFromTemplate (RMI): far 3.0, eff 0.82, avg unit 92 m²,
+  // commercial 12% of plot ⇒ engine units = floor((plot·far·eff − round(plot·0.12)) / 92).
+  const FAR = 3.0;
+  const unitsFor = (plot: number) => Math.floor((plot * FAR * 0.82 - Math.round(plot * 0.12)) / 92);
+  let plotAreaSqm = Math.round((units * 92) / (FAR * 0.82 - 0.12)); // invert the net factor (2.34)
+  // integer-rounding correction so the derived unit count lands exactly on the tender's
+  for (let i = 0; i < 80 && unitsFor(plotAreaSqm) !== units; i++) {
+    plotAreaSqm += unitsFor(plotAreaSqm) < units ? 1 : -1;
+  }
 
-  const inputs = buildInputsFromTemplate({ track: "RMI", city: t.city, plotAreaSqm, far: 3.0, avgPricePerSqm: avgPrice });
+  const inputs = buildInputsFromTemplate({ track: "RMI", city: t.city, plotAreaSqm, far: FAR, avgPricePerSqm: avgPrice });
+  // totalDevelopCost is the RMI project-total development pay (TenderDevPay).
   if (t.totalDevelopCost && t.totalDevelopCost > 0) inputs.developmentCostsRMI = t.totalDevelopCost;
-  else if (t.developPayPerUnit) inputs.developmentCostsRMI = t.developPayPerUnit * units;
 
   const geo = geocodeCity(t.city);
   const created = await Project.create({

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowUpLeft } from "lucide-react";
 import { IconWallet, IconStack, IconRisk, IconDoc, IconCalendar } from "@/components/brand/icons";
 import { getProjects, getCities } from "@/server/queries";
-import { getLiveTenders } from "@/lib/data/rmi";
+import { getLiveTenders, getRmiTotals } from "@/lib/data/rmi";
 import { getDataSourceStatus } from "@/server/status";
 import { analyzeProject } from "@/server/analysis";
 import { computeDealScore } from "@/lib/verdict";
@@ -13,15 +13,16 @@ import { DataSourcePills } from "@/components/common/data-source-pills";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatShekelShort, formatPct } from "@/lib/utils";
+import { formatShekelShort, formatPct, formatNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [projects, cities, tenders, status] = await Promise.all([
+  const [projects, cities, tenders, rmiTotals, status] = await Promise.all([
     getProjects(),
     getCities(),
-    getLiveTenders({ limit: 60 }),
+    getLiveTenders({ limit: 12 }),
+    getRmiTotals(),
     getDataSourceStatus(),
   ]);
   const tendersLive = tenders.some((t) => t.source === "live");
@@ -57,7 +58,7 @@ export default async function DashboardPage() {
 
   const portfolioValue = cards.reduce((s, c) => s + Math.max(0, c.maxLandValue), 0);
   const avgLoss = cards.length ? cards.reduce((s, c) => s + c.probabilityOfLoss, 0) / cards.length : 0;
-  const openTenders = tenders.filter((t) => t.status.includes("מכרז")).length;
+  const openTenders = rmiTotals.inTender;
 
   return (
     <div className="space-y-7">
@@ -94,9 +95,9 @@ export default async function DashboardPage() {
           accent={avgLoss > 0.15 ? "danger" : "success"}
         />
         <StatCard
-          label="מכרזי רמ״י פתוחים"
-          value={openTenders}
-          sub="זמינים להגשה"
+          label="מכרזי רמ״י זמינים"
+          value={formatNumber(openTenders)}
+          sub={`מתוך ${formatNumber(rmiTotals.total)} פרויקטי רמ״י`}
           icon={IconDoc}
           accent="warning"
         />

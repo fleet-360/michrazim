@@ -16,6 +16,7 @@ import { Slider } from "@/components/ui/slider";
 import { VerdictBadge } from "@/components/common/verdict-badge";
 import { TRACK_META } from "@/lib/verdict";
 import { DynamicMap } from "@/components/map/dynamic-map";
+import { FLOOR_H, COVERAGE } from "@/components/map/geo";
 import { ProfitDistribution } from "@/components/charts/profit-distribution";
 import { CostWaterfall } from "@/components/charts/cost-waterfall";
 import { BidGauge } from "@/components/charts/bid-gauge";
@@ -102,9 +103,15 @@ export function ProjectWorkspace(props: WorkspaceProps) {
   const rec = analysis.recommendation;
 
   const bidMax = Math.round(Math.max(rec.winnersCurseThreshold * 1.35, (props.marketAnchor ?? 0) * 1.2, base.recommendation.recommendedBid * 1.8));
-  const footprint = props.plotAreaSqm * 0.42;
+  // תכסית (COVERAGE) and the per-floor height (FLOOR_H) are imported from the map's
+  // geo module so the floor math, the map's visual footprint (passed as
+  // `coverageRatio`), the extruded massing, and BOTH height captions all share one
+  // source of truth and can never drift apart. The height caption uses the same
+  // rounded floor count the map renders, so the panel and on-map pill agree exactly.
+  const footprint = props.plotAreaSqm * COVERAGE;
   const floors = Math.min(60, Math.max(4, det.rights.totalBuiltSqm / footprint));
-  const massingHeight = Math.round(floors * 3.2);
+  const massingFloors = Math.round(floors);
+  const massingHeight = Math.round(massingFloors * FLOOR_H);
 
   const dealScore = computeDealScore({
     marginOnCost: ev.marginOnCost,
@@ -339,7 +346,8 @@ export function ProjectWorkspace(props: WorkspaceProps) {
                   areaSqm={props.plotAreaSqm}
                   gush={props.gush}
                   helka={props.helka}
-                  floors={Math.round(floors)}
+                  floors={massingFloors}
+                  coverageRatio={COVERAGE}
                   comparables={props.comparables.filter((c) => c.lat && c.lng).slice(0, 12)}
                 />
               </div>
@@ -349,7 +357,7 @@ export function ProjectWorkspace(props: WorkspaceProps) {
                   הדמיית מסה
                 </CardTitle>
                 <CardDescription>
-                  נפח הבנייה האפשרי על המגרש לפי הזכויות — {det.rights.units} יח״ד ב-{Math.round(floors)} קומות.
+                  נפח הבנייה האפשרי על המגרש לפי הזכויות — {det.rights.units} יח״ד ב-{massingFloors} קומות.
                 </CardDescription>
                 <dl className="space-y-2.5 pt-2 text-sm">
                   <Row label="שטח מגרש" value={`${formatNumber(props.plotAreaSqm)} מ״ר`} />

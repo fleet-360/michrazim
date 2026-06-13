@@ -1,12 +1,12 @@
 import { Database } from "lucide-react";
-import { getLiveTenders } from "@/lib/data/rmi";
+import { getLiveTenders, getRmiTotals } from "@/lib/data/rmi";
 import { TendersExplorer } from "@/components/tenders/tenders-explorer";
 import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 
 export default async function TendersPage() {
-  const tenders = await getLiveTenders({ limit: 300 });
+  const [tenders, totals] = await Promise.all([getLiveTenders({ limit: 400 }), getRmiTotals()]);
   const live = tenders.some((t) => t.source === "live");
 
   return (
@@ -25,7 +25,7 @@ export default async function TendersPage() {
         </Badge>
       </div>
 
-      <TendersExplorer tenders={tenders} live={live} />
+      <TendersExplorer tenders={tenders} live={live} totalAvailable={totals.total} />
     </div>
   );
 }

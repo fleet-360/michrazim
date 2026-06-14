@@ -9,7 +9,7 @@ import type { RmiTender } from "@/lib/data/rmi";
  * source datasets carry NO parcel coordinates, so this is explicitly a volume
  * study at the city centroid — labelled as such, never claimed as a real site.
  */
-export function TenderMassingPreview({ t }: { t: RmiTender }) {
+export function TenderMassingPreview({ t, precise = false }: { t: RmiTender; precise?: boolean }) {
   if (t.lat == null || t.lng == null) {
     return (
       <div className="grid h-full w-full place-items-center bg-muted/40 text-center text-sm text-muted-foreground">
@@ -34,7 +34,7 @@ export function TenderMassingPreview({ t }: { t: RmiTender }) {
     <div className="relative h-full w-full">
       <DynamicMap lat={t.lat} lng={t.lng} areaSqm={areaSqm} floors={floors} coverageRatio={0.42} illustrative />
       <div className="pointer-events-none absolute right-3 top-3 z-10 rounded-full bg-black/65 px-2.5 py-1 text-xs font-medium text-white backdrop-blur">
-        הדמיית נפח להמחשה · לא מיקום מדויק
+        {precise ? "הדמיית נפח · מיקום מקורב לשכונה" : "הדמיית נפח להמחשה · לא מיקום מדויק"}
       </div>
     </div>
   );

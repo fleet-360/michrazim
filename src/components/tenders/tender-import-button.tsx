@@ -22,12 +22,15 @@ export function TenderImportButton({ t, className }: { t: RmiTender; className?:
               targetUnits: t.targetUnits || t.units,
               existingUnits: t.existingUnits,
               planNumber: t.planNumber,
+              semelYeshuv: t.semelYeshuv,
             })
           : await importTenderAction({
               name: t.name,
               city: t.city,
               units: t.units,
               totalDevelopCost: t.totalDevelopCost,
+              site: t.site,
+              semelYeshuv: t.semelYeshuv,
             });
       if (res?.requireAuth) {
         toast("התחברו כדי לשמור ולנתח את המכרז", { description: "הצפייה חופשית — השמירה דורשת חשבון." });

@@ -84,6 +84,10 @@ export function MarkersMap({ points, className, showLabels = true }: { points: M
       center: [34.95, 31.6],
       zoom: 6.7,
       pitch: USE_MAPBOX ? 45 : 0, // 3D perspective — buildings reveal as you zoom into a city
+      maxPitch: 85,
+      dragRotate: true, // 360° rotate via right-drag / ctrl-drag
+      touchZoomRotate: true, // two-finger rotate + zoom on touch
+      pitchWithRotate: true,
       attributionControl: { compact: true },
     });
     mapRef.current = map;
@@ -248,7 +252,7 @@ export function MarkersMap({ points, className, showLabels = true }: { points: M
         className={`pointer-events-none absolute inset-0 z-20 grid place-items-center transition-opacity duration-200 ${scrollHint ? "opacity-100" : "opacity-0"}`}
       >
         <div className="rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-white backdrop-blur">
-          החזיקו Ctrl וגללו כדי להתקרב
+החזיקו Ctrl וגללו לזום · גררו לסיבוב 360° והטיה
         </div>
       </div>
     </div>

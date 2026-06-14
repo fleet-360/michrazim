@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getTenderById } from "@/lib/data/rmi";
+import { geocodeTenderPoint } from "@/lib/data/govmap";
 import { getCities, getWatchlist } from "@/server/queries";
 import { getSession } from "@/server/auth";
 import { analyzeProject } from "@/server/analysis";
@@ -13,7 +14,17 @@ export default async function TenderPage({ params }: { params: Promise<{ id: str
   const tender = await getTenderById(decodeURIComponent(id));
   if (!tender) notFound();
 
-  const [cities, session, watchlist] = await Promise.all([getCities(), getSession(), getWatchlist()]);
+  const [cities, session, watchlist, point] = await Promise.all([
+    getCities(),
+    getSession(),
+    getWatchlist(),
+    geocodeTenderPoint({ city: tender.city, site: tender.site, name: tender.name, semelYeshuv: tender.semelYeshuv }),
+  ]);
+  // upgrade the massing location to a precise (neighborhood/address) point when GovMap resolved one
+  if (point) {
+    tender.lat = point.lat;
+    tender.lng = point.lng;
+  }
   const cityRow = cities.find((c) => c.name === tender.city);
   const avgPrice = cityRow?.avgResidentialPricePerSqm ?? 26000;
 
@@ -35,5 +46,13 @@ export default async function TenderPage({ params }: { params: Promise<{ id: str
     estimate = null;
   }
 
-  return <TenderDetail t={tender} estimate={estimate} isAuthed={!!session} watching={watchlist.includes(tender.id)} />;
+  return (
+    <TenderDetail
+      t={tender}
+      estimate={estimate}
+      isAuthed={!!session}
+      watching={watchlist.includes(tender.id)}
+      preciseLocation={!!point?.precise}
+    />
+  );
 }

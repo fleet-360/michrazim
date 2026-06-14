@@ -1,8 +1,93 @@
 import { safeJson } from "./http";
+import { itmToWgs84 } from "./itm";
+import { geocodeCity } from "./localities";
 
 // Best-effort cadastral parcel lookup. Israel's national GIS (GovMap / Survey of
 // Israel) exposes ArcGIS-style services; exact endpoints shift, so we attempt a
 // known query and always fall back to a synthesized parcel so the map/3D render.
+
+/* ── GovMap geocoder (text → real coordinates) ───────────────────────────────
+ *  GovMap's search resolves a free-text query (neighborhood, street, address, or
+ *  even "גוש X חלקה Y") to a point in ITM (EPSG:2039). We convert to WGS84. This
+ *  lifts tender placement from settlement-centroid to neighborhood/address level
+ *  — far more accurate than the city centroid. Cached per query. */
+export interface GeoHit {
+  lat: number;
+  lng: number;
+  label: string;
+  gush?: string;
+  parcel?: string;
+  type: string;
+}
+const geoCache = new Map<string, GeoHit | null>();
+// preference order: precise address/parcel first, then neighborhood/street, then POI
+const GEO_TYPE_RANK = ["ADDRESS", "GOVMAP_PARCEL_ALL", "NEIGHBORHOOD", "STREET", "POI_MID_POINT"];
+
+type GovHit = { X?: number; Y?: number; ResultLable?: string; Gush?: string; Parcel?: string };
+
+export async function govmapGeocode(query: string): Promise<GeoHit | null> {
+  const q = query.trim();
+  if (!q) return null;
+  if (geoCache.has(q)) return geoCache.get(q)!;
+  const url = `https://es.govmap.gov.il/TldSearch/api/DetailsByQuery?query=${encodeURIComponent(q)}&lyrs=276267023&gid=govmap`;
+  const json = await safeJson<{ data?: Record<string, GovHit[]> }>(url, { timeoutMs: 9000 });
+  const data = json?.data;
+  let best: GeoHit | null = null;
+  if (data) {
+    const pick = (arr?: GovHit[]): GeoHit | null => {
+      const a = arr?.find((r) => r.X && r.Y);
+      if (!a) return null;
+      const [lat, lng] = itmToWgs84(a.X!, a.Y!);
+      return { lat, lng, label: a.ResultLable ?? q, gush: a.Gush || undefined, parcel: a.Parcel || undefined, type: "" };
+    };
+    for (const type of GEO_TYPE_RANK) {
+      const hit = pick(data[type]);
+      if (hit) {
+        best = { ...hit, type };
+        break;
+      }
+    }
+    if (!best) {
+      for (const k of Object.keys(data)) {
+        const hit = pick(data[k]);
+        if (hit) {
+          best = { ...hit, type: k };
+          break;
+        }
+      }
+    }
+  }
+  geoCache.set(q, best);
+  return best;
+}
+
+/**
+ * Best-effort precise coordinate for a tender: tries GovMap on "neighborhood, city"
+ * (and the project name), falling back to the CBS settlement centroid. `precise`
+ * is true only when GovMap resolved a neighborhood/address (not the city fallback).
+ */
+export async function geocodeTenderPoint(t: {
+  city: string;
+  site?: string;
+  name?: string;
+  semelYeshuv?: string;
+}): Promise<{ lat: number; lng: number; precise: boolean } | null> {
+  // Only query GovMap for strings that look like a searchable place — most tender
+  // "site"/name fields are internal plot codes ("מגרש 12", "254-256") that never
+  // resolve, so skipping them avoids wasted calls (and they'd fall back anyway).
+  const looksLikePlace = (s?: string) =>
+    !!s && s.trim().length >= 3 && !/מגרש|^[\d,\-./\s]+$/.test(s.trim());
+  const tryQueries: string[] = [];
+  const site = (t.site ?? "").trim();
+  if (site && site !== "—" && looksLikePlace(site)) tryQueries.push(`${site}, ${t.city}`);
+  if (looksLikePlace(t.name) && t.name !== t.city) tryQueries.push(`${t.name}, ${t.city}`);
+  for (const q of tryQueries) {
+    const g = await govmapGeocode(q).catch(() => null);
+    if (g) return { lat: g.lat, lng: g.lng, precise: true };
+  }
+  const c = geocodeCity(t.city, t.semelYeshuv);
+  return c ? { lat: c.lat, lng: c.lng, precise: false } : null;
+}
 
 export interface ParcelGeometry {
   /** GeoJSON Polygon ring of [lng, lat] pairs. */

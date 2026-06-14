@@ -281,12 +281,15 @@ export async function deleteProjectAction(id: string) {
 
 import { buildInputsFromTemplate } from "@/lib/templates";
 import { geocodeCity } from "@/lib/data/localities";
+import { geocodeTenderPoint } from "@/lib/data/govmap";
 
 export interface ImportTenderInput {
   name: string;
   city: string;
   units: number;
   totalDevelopCost?: number;
+  site?: string;
+  semelYeshuv?: string;
 }
 
 export type ImportResult = { error?: string; requireAuth?: boolean } | void;
@@ -299,6 +302,8 @@ interface CreateImportedOpts {
   far: number;
   developCost?: number;
   existingUnits?: number;
+  site?: string;
+  semelYeshuv?: string;
 }
 
 /** Shared project-creation for both import flows. Throws on DB failure. */
@@ -319,7 +324,13 @@ async function createImportedProject(opts: CreateImportedOpts): Promise<string> 
     existingUnits: opts.existingUnits && opts.existingUnits > 0 ? opts.existingUnits : undefined,
   });
   if (opts.developCost && opts.developCost > 0) inputs.developmentCostsRMI = opts.developCost;
-  const geo = geocodeCity(opts.city);
+  // precise (neighborhood/address) coordinate via GovMap, falling back to the city centroid
+  const geo = await geocodeTenderPoint({
+    city: opts.city,
+    site: opts.site,
+    name: opts.name,
+    semelYeshuv: opts.semelYeshuv,
+  });
   const created = await Project.create({
     name: opts.name,
     track: opts.track,
@@ -352,6 +363,8 @@ export async function importTenderAction(t: ImportTenderInput): Promise<ImportRe
       units: t.units,
       far: 3.0,
       developCost: t.totalDevelopCost,
+      site: t.site,
+      semelYeshuv: t.semelYeshuv,
     });
   } catch (e) {
     console.error("importTenderAction failed:", e);
@@ -367,6 +380,7 @@ export interface ImportRenewalInput {
   targetUnits: number;
   existingUnits?: number;
   planNumber?: string;
+  semelYeshuv?: string;
 }
 
 /** Create an URBAN_RENEWAL project from a live urban-renewal compound (פינוי-בינוי/תמ"א). */
@@ -381,6 +395,7 @@ export async function importRenewalAction(t: ImportRenewalInput): Promise<Import
       units: t.targetUnits,
       far: 4.5,
       existingUnits: t.existingUnits,
+      semelYeshuv: t.semelYeshuv,
     });
   } catch (e) {
     console.error("importRenewalAction failed:", e);

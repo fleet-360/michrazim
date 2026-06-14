@@ -24,11 +24,13 @@ export function TenderDetail({
   estimate,
   isAuthed,
   watching = false,
+  preciseLocation = false,
 }: {
   t: RmiTender;
   estimate?: TenderEstimate | null;
   isAuthed?: boolean;
   watching?: boolean;
+  preciseLocation?: boolean;
 }) {
   const meta = CATEGORY_META[t.category];
   const stats = buildStats(t);
@@ -154,7 +156,7 @@ export function TenderDetail({
         <div className="space-y-5">
           <Card className="overflow-hidden p-0">
             <div className="h-[300px]">
-              <TenderMassingPreview t={t} />
+              <TenderMassingPreview t={t} precise={preciseLocation} />
             </div>
             {links.length > 0 && (
               <div className="flex flex-wrap gap-2 border-t border-border p-4">

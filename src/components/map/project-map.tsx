@@ -898,6 +898,10 @@ export function ProjectMap({
       zoom: 15.2, // start slightly out; the reveal flies into the framed parcel
       pitch: 30,
       bearing: 0,
+      maxPitch: 85, // allow a near-ground-level look
+      dragRotate: true, // 360° rotate via right-drag / ctrl-drag
+      touchZoomRotate: true, // two-finger rotate + zoom on touch
+      pitchWithRotate: true,
       // Disable the default attribution control and add a compact one explicitly:
       // mapbox-gl types the map option as `attributionControl?: boolean` and ignores
       // a `{ compact }` object (rendering non-compact), while maplibre accepts the
@@ -1015,7 +1019,7 @@ export function ProjectMap({
         className={`pointer-events-none absolute inset-0 z-20 grid place-items-center transition-opacity duration-200 ${scrollHint ? "opacity-100" : "opacity-0"}`}
       >
         <div className="rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-white backdrop-blur">
-          החזיקו Ctrl וגללו כדי להתקרב
+החזיקו Ctrl וגללו לזום · גררו לסיבוב 360° והטיה
         </div>
       </div>
     </div>

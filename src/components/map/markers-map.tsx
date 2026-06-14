@@ -71,7 +71,6 @@ export function MarkersMap({ points, className, showLabels = true }: { points: M
   const mapRef = React.useRef<maplibregl.Map | null>(null);
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme !== "light";
-  const [scrollHint, setScrollHint] = React.useState(false);
   const [show3d, setShow3d] = React.useState(USE_MAPBOX);
 
   React.useEffect(() => {
@@ -93,21 +92,13 @@ export function MarkersMap({ points, className, showLabels = true }: { points: M
     mapRef.current = map;
     map.addControl(new gl.NavigationControl({ visualizePitch: true }), "top-left");
 
-    map.scrollZoom.disable();
-    const container = ref.current;
-    let hintTimer: ReturnType<typeof setTimeout>;
-    const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const p = map.unproject([e.offsetX, e.offsetY]);
-        map.easeTo({ zoom: map.getZoom() - e.deltaY * 0.0026, around: p, duration: 60 });
-      } else {
-        setScrollHint(true);
-        clearTimeout(hintTimer);
-        hintTimer = setTimeout(() => setScrollHint(false), 1300);
-      }
-    };
-    container.addEventListener("wheel", onWheel, { passive: false });
+    // Smooth, native wheel-zoom around the cursor + inertial pan. This is a
+    // dedicated, map-first page, so the wheel should zoom the map directly — the
+    // old Ctrl-gated `easeTo`-per-tick replacement felt laggy and unresponsive.
+    map.scrollZoom.enable();
+    map.scrollZoom.setWheelZoomRate(1 / 380); // a touch smoother than the default
+    map.dragPan.enable(); // inertial panning (on by default; explicit for clarity)
+    map.keyboard.enable();
 
     // theme-aware popup palette (fixes the white-on-white tooltip)
     const pop = dark
@@ -206,8 +197,6 @@ export function MarkersMap({ points, className, showLabels = true }: { points: M
     });
 
     return () => {
-      container.removeEventListener("wheel", onWheel);
-      clearTimeout(hintTimer);
       map.remove();
       mapRef.current = null;
     };
@@ -248,13 +237,6 @@ export function MarkersMap({ points, className, showLabels = true }: { points: M
           תלת-ממד {show3d ? "פעיל" : "כבוי"}
         </button>
       )}
-      <div
-        className={`pointer-events-none absolute inset-0 z-20 grid place-items-center transition-opacity duration-200 ${scrollHint ? "opacity-100" : "opacity-0"}`}
-      >
-        <div className="rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-white backdrop-blur">
-החזיקו Ctrl וגללו לזום · גררו לסיבוב 360° והטיה
-        </div>
-      </div>
     </div>
   );
 }

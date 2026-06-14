@@ -12,10 +12,10 @@ import {
   insetMeters,
   synthRing,
   meterFrame,
+  toMeters,
+  toLngLat,
   absAreaM2,
-  scaleToAreaM2,
   principalAxis,
-  orientedRectInside,
   ringBounds,
   ringOrientationDeg,
   FLOOR_H,
@@ -39,6 +39,9 @@ export interface ProjectMapProps {
   helka?: string;
   /** Number of floors — drives the massing height & form. */
   floors?: number;
+  /** Total dwelling units — drives the building TYPOLOGY & COUNT (1 block vs a
+   *  cluster of towers), so the massing reflects the real scheme size. */
+  units?: number;
   /** Building-coverage ratio (תכסית) used upstream to derive floors. Sizing the
    *  visual footprint from the same number keeps the massing and floor math
    *  consistent — footprint area = coverageRatio · parcelArea. */
@@ -53,9 +56,6 @@ export interface ProjectMapProps {
 }
 
 const SETBACK_M = 5; // קו בניין — perpendicular setback from every parcel edge
-const TOWER_FROM_PODIUM_M = 3; // extra inset of the tower face from the podium edge
-const TOWER_ASPECT = 2.4; // slab slenderness when high-rise & elongated
-const ELONGATION_FOR_TOWER = 1.35; // only orient a slab if the lot is this elongated
 
 /* ── architectural palette (both themes) ─────────────────────────────────────
  *  Cool desaturated steel-blue glass tower (reads as curtain-wall, not toy
@@ -66,6 +66,8 @@ function palette(dark: boolean) {
   return {
     tower: dark ? "#5b6b8c" : "#8aa0c4", // glass curtain-wall
     towerHi: dark ? "#6f80a6" : "#9fb2d2", // slender high-rise variant
+    slabBody: dark ? "#5f6b78" : "#aeb9c6", // mid-rise residential slab (plaster + glazing)
+    cottageBody: dark ? "#7a6f5a" : "#d8cdb4", // low garden-apartment / cottage (warm render)
     podium: dark ? "#6b6357" : "#cabfab", // warm stone / concrete
     podiumLobby: dark ? "#2f3647" : "#3a4253", // recessed glazed ground floor
     cornice: dark ? "#8a8170" : "#ddd2bd", // proud podium roofline cap
@@ -285,14 +287,14 @@ function addContextBuildings(map: maplibregl.Map, dark: boolean) {
     filter: ["all", ["==", ["get", "extrude"], "true"], ["==", ["geometry-type"], "Polygon"]],
     paint: {
       "fill-extrusion-color": contextColor(dark) as maplibregl.ExpressionSpecification,
+      // collapse to 0 height when feature-state `hide` is set — we "demolish" the
+      // existing buildings that sit on the project's lot so the massing reads as a
+      // cleared development site rather than clipping through real buildings.
       "fill-extrusion-height": [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        14.5,
+        "case",
+        ["boolean", ["feature-state", "hide"], false],
         0,
-        15.5,
-        ["coalesce", ["get", "height"], 6],
+        ["interpolate", ["linear"], ["zoom"], 14.5, 0, 15.5, ["coalesce", ["get", "height"], 6]],
       ] as unknown as maplibregl.ExpressionSpecification,
       "fill-extrusion-base": ["coalesce", ["get", "min_height"], 0] as unknown as maplibregl.ExpressionSpecification,
       "fill-extrusion-opacity": dark ? 0.82 : 0.9,
@@ -311,21 +313,27 @@ function addContextBuildings(map: maplibregl.Map, dark: boolean) {
  *  fill-extrusion layer can color material variety via a ["match", …]
  *  expression — keeps the layer count tiny and `setData`-friendly. */
 
-const MAX_FLOOR_BANDS = 28; // hard perf cap on floor-reveal features
+const MAX_FLOOR_BANDS = 28; // hard perf cap on floor-reveal features (total across buildings)
+const UNITS_PER_FLOOR = 4; // typical Israeli residential core (3–6 units/floor)
+
+/** Building typology — drives footprint shape, material and crown. */
+type Tier = "cottage" | "block" | "slab" | "tower" | "towerHi";
+const TIER_KIND: Record<Tier, number> = { tower: 40, towerHi: 41, slab: 42, block: 43, cottage: 44 };
+const TIER_ASPECT: Record<Tier, number> = { cottage: 1.2, block: 1.5, slab: 2.6, tower: 1.15, towerHi: 1.1 };
 
 interface Massing {
   parcel: GeoJSON.Feature;
-  podium: GeoJSON.FeatureCollection; // lobby + stone + cornice (kind 20-22)
-  tower: GeoJSON.Feature; // glass shaft
-  towerColor: string;
-  frame: GeoJSON.Feature; // structural frame inside the glass
-  articulation: GeoJSON.FeatureCollection; // floor reveals, bays, balcony (kind 0-3)
-  crown: GeoJSON.FeatureCollection; // roof plate + parapet + penthouse (kind 10-13)
-  core: GeoJSON.Feature; // service-core overrun (kind 30; flat placeholder when low-rise)
-  footprintRing: Ring; // the podium/footprint ring, for the ground-contact shadow
+  podium: GeoJSON.FeatureCollection; // shared podium (towers) or empty placeholder
+  shafts: GeoJSON.FeatureCollection; // one extruded body per building (kind = material)
+  frame: GeoJSON.FeatureCollection; // (unused now — kept so the layer source stays alive)
+  articulation: GeoJSON.FeatureCollection; // floor-line reveals across all buildings
+  crown: GeoJSON.FeatureCollection; // parapet + penthouse per building
+  core: GeoJSON.FeatureCollection; // (unused now)
+  footprintRings: Ring[]; // every building footprint, for ground-contact shadows
+  scheme: { n: number; floorsPer: number; tier: Tier }; // for the on-map caption
 }
 
-type FormTier = "block" | "podium-tower" | "slender";
+const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
 /** Thin recessed floor-line grooves (and optional proud slab faces) stacked in
  *  Z over the shaft. Bounded by MAX_FLOOR_BANDS; the step thins out tall towers. */
@@ -336,12 +344,13 @@ function floorReveals(
   baseElev: number,
   topElev: number,
   proud: boolean,
+  cap = MAX_FLOOR_BANDS,
 ): GeoJSON.Feature[] {
   const SLAB_REVEAL_H = 0.25;
   const SLAB_PROUD_H = 0.35;
   const span = topElev - baseElev;
   const nFloors = Math.max(1, Math.floor(span / FLOOR_H));
-  const step = Math.max(1, Math.ceil(nFloors / MAX_FLOOR_BANDS));
+  const step = Math.max(1, Math.ceil(nFloors / cap));
   const out: GeoJSON.Feature[] = [];
   for (let i = step; i < nFloors; i += step) {
     const z = baseElev + i * FLOOR_H;
@@ -352,45 +361,84 @@ function floorReveals(
   return out;
 }
 
-/** Two full-height vertical reveal strips on a slab lot's long facade (bays). */
-function facadeBays(
-  axisDir: [number, number],
-  c: [number, number],
-  frame: ReturnType<typeof meterFrame>,
-  longSide: number,
-  shortSide: number,
-  baseElev: number,
-  topElev: number,
-): GeoJSON.Feature[] {
-  const w = 0.4; // reveal width (m)
-  const ax = axisDir;
-  const pp: [number, number] = [-ax[1], ax[0]];
-  const half = shortSide / 2 + 0.05; // span the depth, slightly proud
-  const offsets = [-longSide / 6, longSide / 6]; // ~1/3 & 2/3 along the long axis
-  const cm = meterToRef(c, frame);
-  const feats: GeoJSON.Feature[] = [];
-  for (const o of offsets) {
-    const cornersM: [number, number][] = (
-      [
-        [o - w / 2, -half],
-        [o + w / 2, -half],
-        [o + w / 2, half],
-        [o - w / 2, half],
-      ] as [number, number][]
-    ).map(([u, v]) => [cm[0] + ax[0] * u + pp[0] * v, cm[1] + ax[1] * u + pp[1] * v]);
-    const ring: Ring = cornersM.map((m) => refToLngLat(m, frame));
-    ring.push(ring[0]);
-    feats.push(poly(ring, { base: baseElev, top: topElev, kind: 2 }));
-  }
-  return feats;
+const clampI = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(x)));
+
+/**
+ * Choose a realistic typology, building COUNT and per-building floor count from the
+ * tender's actual unit total — so 12 units reads as a low block, ~150 as a few
+ * mid-rise slabs, and a big urban-renewal scheme as a cluster of towers on a podium.
+ */
+function pickScheme(units: number): { n: number; floorsPer: number; tier: Tier; podium: boolean } {
+  const U = Math.max(1, Math.round(units));
+  if (U <= 4) return { n: Math.min(2, Math.max(1, U)), floorsPer: 2, tier: "cottage", podium: false };
+  if (U <= 28) return { n: 1, floorsPer: clampI(U / UNITS_PER_FLOOR, 3, 8), tier: "block", podium: false };
+  if (U <= 80) return { n: 2, floorsPer: clampI(U / (2 * UNITS_PER_FLOOR), 4, 9), tier: "block", podium: false };
+  if (U <= 180) return { n: 3, floorsPer: clampI(U / (3 * UNITS_PER_FLOOR), 5, 12), tier: "slab", podium: false };
+  if (U <= 450) return { n: 4, floorsPer: clampI(U / (4 * 5), 10, 24), tier: "tower", podium: true };
+  const n = clampI(U / 600, 5, 6);
+  return { n, floorsPer: clampI(U / (n * 6), 18, 42), tier: "towerHi", podium: true };
 }
 
-// tiny meter<->lnglat helpers bound to a frame (kept local to the facade-bay math)
-function meterToRef(p: [number, number], f: ReturnType<typeof meterFrame>): [number, number] {
-  return [(p[0] - f.lng0) * f.mPerLng, (p[1] - f.lat0) * 111320];
-}
-function refToLngLat(p: [number, number], f: ReturnType<typeof meterFrame>): [number, number] {
-  return [f.lng0 + p[0] / f.mPerLng, f.lat0 + p[1] / 111320];
+/**
+ * Lay out `n` building footprints in a grid inside `container`, aligned to the lot's
+ * principal axis, each sized to ~`totalAreaM2/n` (capped to its cell minus a gap).
+ */
+function gridFootprints(
+  container: Ring,
+  axisDir: [number, number],
+  n: number,
+  totalAreaM2: number,
+  aspect: number,
+  frame: ReturnType<typeof meterFrame>,
+): Ring[] {
+  const ang = Math.atan2(axisDir[1], axisDir[0]);
+  const ca = Math.cos(-ang);
+  const sa = Math.sin(-ang);
+  const cb = Math.cos(ang);
+  const sb = Math.sin(ang);
+  const rot = (p: [number, number]): [number, number] => [p[0] * ca - p[1] * sa, p[0] * sa + p[1] * ca];
+  const unrot = (p: [number, number]): [number, number] => [p[0] * cb - p[1] * sb, p[0] * sb + p[1] * cb];
+  const closed = container.length > 1 && container[0][0] === container[container.length - 1][0] && container[0][1] === container[container.length - 1][1];
+  const open = closed ? container.slice(0, -1) : container;
+  const P = open.map((p) => rot(toMeters(p, frame)));
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of P) {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const W = Math.max(maxX - minX, 1);
+  const D = Math.max(maxY - minY, 1);
+  const cols = clampI(Math.sqrt(n * (W / D)), 1, n);
+  const rows = Math.ceil(n / cols);
+  const gap = 7;
+  const cellW = W / cols;
+  const cellD = D / rows;
+  const perArea = totalAreaM2 / n;
+  const out: Ring[] = [];
+  let placed = 0;
+  for (let r = 0; r < rows && placed < n; r++) {
+    for (let col = 0; col < cols && placed < n; col++) {
+      const cx = minX + (col + 0.5) * cellW;
+      const cy = minY + (r + 0.5) * cellD;
+      let hw = Math.max(2, Math.sqrt(perArea / aspect) / 2); // half-width (across axis)
+      let hl = Math.max(2, hw * aspect); // half-length (along axis)
+      hl = Math.min(hl, Math.max(2, (cellW - gap) / 2));
+      hw = Math.min(hw, Math.max(2, (cellD - gap) / 2));
+      const cornersAxis: [number, number][] = [
+        [cx - hl, cy - hw],
+        [cx + hl, cy - hw],
+        [cx + hl, cy + hw],
+        [cx - hl, cy + hw],
+      ];
+      const ring: Ring = cornersAxis.map((p) => toLngLat(unrot(p), frame));
+      ring.push(ring[0]);
+      out.push(ring);
+      placed++;
+    }
+  }
+  return out;
 }
 
 /**
@@ -399,135 +447,109 @@ function refToLngLat(p: [number, number], f: ReturnType<typeof meterFrame>): [nu
  * tower), so the building sits believably inside the lot with a real setback gap
  * and the tower runs along the lot's long axis.
  */
-function buildMassing(ring: Ring, floors: number, coverageRatio = COVERAGE): Massing {
-  const f = Math.max(2, Math.round(floors));
-  const totalH = f * FLOOR_H;
+function buildMassing(ring: Ring, floors: number, coverageRatio = COVERAGE, units = 0): Massing {
   const c = centroid(ring);
   const frame = meterFrame(c[0], c[1]);
   const plotArea = absAreaM2(ring, frame);
-
-  // form tier by height
-  let tier: FormTier;
-  if (f <= 8) tier = "block";
-  else if (f <= 22) tier = "podium-tower";
-  else tier = "slender";
-  const podiumFloors = tier === "block" ? 0 : tier === "podium-tower" ? 4 : 5;
-  const podiumH = podiumFloors * FLOOR_H;
-
-  // 1) Setback offset = the building line (true metric, never null via fallback).
   const offset = insetMeters(ring, SETBACK_M, 0.25, frame);
   const offsetArea = absAreaM2(offset, frame);
-
-  // 2) Podium = setback footprint sized to coverage (תכסית), capped by offset area.
-  const targetFootprint = Math.min(coverageRatio * plotArea, offsetArea);
-  const podiumRing =
-    targetFootprint < offsetArea - 1 ? scaleToAreaM2(offset, targetFootprint, frame) : offset;
-
-  // 3) Tower: oriented slab along the principal axis, further inset from podium.
   const axis = principalAxis(ring, frame);
-  const towerContainer = insetMeters(podiumRing, TOWER_FROM_PODIUM_M, 0.4, frame);
-  const containerArea = absAreaM2(towerContainer, frame);
-  const towerFrac = f <= 8 ? 1.0 : f <= 22 ? 0.62 : 0.44; // slimmer with height
-  const towerArea = Math.min(absAreaM2(podiumRing, frame) * towerFrac, containerArea);
-  const slab = axis.elongation >= ELONGATION_FOR_TOWER;
-  const useOriented = f > 8 && slab;
-  const shaftRing = useOriented
-    ? orientedRectInside(
-        towerContainer,
-        axis.dir,
-        { targetAreaM2: towerArea, aspect: TOWER_ASPECT },
-        frame,
-      )
-    : scaleToAreaM2(towerContainer, towerArea, frame);
 
-  const shaftBase = podiumH;
-  const shaftTop = totalH;
+  // unit-driven scheme; fall back to a floor-derived single building when units unknown
+  const scheme =
+    units > 0
+      ? pickScheme(units)
+      : {
+          n: 1,
+          floorsPer: Math.max(2, Math.round(floors)),
+          tier: (floors > 22 ? "towerHi" : floors > 8 ? "tower" : "block") as Tier,
+          podium: floors > 8,
+        };
 
-  // structural frame just inside the glass (peeks ~0.4m above at the top)
-  const frameRing = insetMeters(shaftRing, 0.6, 0.5, frame);
+  const podiumFloors = scheme.podium ? 4 : 0;
+  const podiumH = podiumFloors * FLOOR_H;
 
-  // ── articulation (floor reveals + slab lot bays + balcony) — bounded ────────
-  const recessRing = insetMeters(shaftRing, 0.15, 0.5, frame); // groove (inward)
-  const proudRing = insetRing(shaftRing, -0.0015); // projecting slab (slight outward)
-  const art: GeoJSON.Feature[] = [];
-  art.push(...floorReveals(shaftRing, recessRing, proudRing, shaftBase, shaftTop, tier !== "block"));
+  // total building footprint = coverage × plot (תכסית), capped by the offset area
+  const totalFootprint = Math.min(coverageRatio * plotArea, offsetArea * 0.92);
+  // towers cover less ground (they go up); blocks/slabs spread their footprint out
+  const layoutArea = scheme.podium ? Math.min(totalFootprint, offsetArea * 0.5) : totalFootprint;
+  const container = scheme.podium ? insetMeters(offset, 3, 0.5, frame) : offset;
+  const footprints = gridFootprints(container, axis.dir, scheme.n, layoutArea, TIER_ASPECT[scheme.tier], frame);
 
-  // metrics for slab-lot bay articulation
-  const sb = ringBounds(shaftRing);
-  const shaftFrame = meterFrame((sb[0] + sb[2]) / 2, (sb[1] + sb[3]) / 2);
-  const sm = absAreaM2(shaftRing, shaftFrame);
-  // approximate side lengths from the oriented axis for bay placement
-  if (useOriented) {
-    const longSide = Math.sqrt(sm * TOWER_ASPECT);
-    const shortSide = sm / Math.max(longSide, 1);
-    const sc = centroid(shaftRing);
-    art.push(
-      ...facadeBays(axis.dir, sc, frame, longSide, shortSide, shaftBase, shaftTop),
-    );
-  }
-  if (f >= 14) {
-    const z = shaftBase + (shaftTop - shaftBase) * 0.45;
-    const balconyRing = insetRing(shaftRing, -0.0035); // projects slightly proud
-    art.push(poly(balconyRing, { base: z, top: z + 0.8, kind: 3 }));
-  }
-
-  // ── podium: recessed glass lobby + stone mass + proud cornice ───────────────
+  // ── shared podium (tower schemes) ──
   const podiumFeatures: GeoJSON.Feature[] = [];
-  if (podiumFloors > 0) {
-    const lobbyRing = insetMeters(podiumRing, 0.5, 0.6, frame); // recessed glazed base
-    const corniceRing = insetRing(podiumRing, -0.0025); // proud roofline cap
+  let footprintRings: Ring[];
+  if (scheme.podium && podiumFloors > 0) {
+    const lobbyRing = insetMeters(offset, 0.5, 0.6, frame);
+    const corniceRing = insetRing(offset, -0.0025);
     podiumFeatures.push(
-      poly(lobbyRing, { base: 0, top: 0.4, kind: 20 }), // glass lobby
-      poly(podiumRing, { base: 0.4, top: Math.max(podiumH - 0.5, 0.5), kind: 21 }), // stone mass
-      poly(corniceRing, { base: Math.max(podiumH - 0.5, 0.5), top: podiumH + 0.3, kind: 22 }), // cornice
+      poly(lobbyRing, { base: 0, top: 0.4, kind: 20 }),
+      poly(offset, { base: 0.4, top: Math.max(podiumH - 0.5, 0.5), kind: 21 }),
+      poly(corniceRing, { base: Math.max(podiumH - 0.5, 0.5), top: podiumH + 0.3, kind: 22 }),
     );
+    footprintRings = [offset];
   } else {
-    // low block: the shaft itself is the building; keep an empty source feature
-    podiumFeatures.push(poly(podiumRing, { base: 0, top: 0, kind: 21 }));
+    podiumFeatures.push(poly(offset, { base: 0, top: 0, kind: 21 })); // flat placeholder keeps the source alive
+    footprintRings = footprints;
   }
 
-  // ── crown: dark recessed roof plate + parapet upstand + mechanical penthouse ─
-  const parapetRing = insetRing(shaftRing, 0.012); // ~edge — a parapet, not a centred block
-  const roofPlateRing = insetMeters(shaftRing, 0.9, 0.6, frame);
-  const phInset = Math.max(1.5, Math.sqrt(sm) * 0.18);
-  const penthouseRing = insetMeters(shaftRing, phInset, 0.5, frame);
-  const phCapRing = insetMeters(shaftRing, phInset + 0.3, 0.5, frame);
-  const crownFeatures: GeoJSON.Feature[] = [
-    poly(roofPlateRing, { base: totalH, top: totalH + 0.15, kind: 10 }), // dark recessed roof
-    poly(parapetRing, { base: totalH, top: totalH + 0.9, kind: 11 }), // slim parapet lip
-  ];
-  // no mechanical penthouse on low blocks (looks wrong on a 6-storey)
-  if (f > 10) {
-    crownFeatures.push(
-      poly(penthouseRing, { base: totalH + 0.15, top: totalH + 2.6, kind: 12 }), // mechanical setback
-      poly(phCapRing, { base: totalH + 2.6, top: totalH + 3.0, kind: 13 }), // penthouse coping
+  // ── per-building shafts + floor reveals + crowns ──
+  const shafts: GeoJSON.Feature[] = [];
+  const art: GeoJSON.Feature[] = [];
+  const crown: GeoJSON.Feature[] = [];
+  const bandCap = Math.max(3, Math.floor(MAX_FLOOR_BANDS / Math.max(1, footprints.length)));
+  const kind = TIER_KIND[scheme.tier];
+  for (const fp of footprints) {
+    const top = podiumH + scheme.floorsPer * FLOOR_H;
+    shafts.push(poly(fp, { base: podiumH, top, kind }));
+    const recess = insetMeters(fp, 0.15, 0.5, frame);
+    const proud = insetRing(fp, -0.0015);
+    art.push(...floorReveals(fp, recess, proud, podiumH, top, scheme.tier !== "cottage", bandCap));
+    const parapet = insetRing(fp, 0.012);
+    const roofPlate = insetMeters(fp, 0.9, 0.6, frame);
+    crown.push(
+      poly(roofPlate, { base: top, top: top + 0.15, kind: 10 }),
+      poly(parapet, { base: top, top: top + 0.9, kind: 11 }),
     );
+    if (scheme.tier === "tower" || scheme.tier === "towerHi") {
+      const sm = absAreaM2(fp, frame);
+      const phInset = Math.max(1.5, Math.sqrt(sm) * 0.2);
+      crown.push(poly(insetMeters(fp, phInset, 0.5, frame), { base: top + 0.15, top: top + 2.6, kind: 12 }));
+    }
   }
-
-  // ── service-core overrun (high-rise) — always emit a feature for the source ──
-  const coreRing = insetMeters(shaftRing, Math.max(Math.sqrt(sm) * 0.25, 2), 0.4, frame);
-  const core =
-    tier === "slender"
-      ? poly(coreRing, { base: totalH + 1.0, top: totalH + 4.5, kind: 30 })
-      : poly(coreRing, { base: 0, top: 0, kind: 30 }); // flat placeholder keeps the source alive
-
-  const towerColor = tier === "slender" ? palette(true).towerHi : palette(true).tower;
 
   return {
     parcel: poly(ring),
     podium: { type: "FeatureCollection", features: podiumFeatures },
-    tower: poly(shaftRing, { base: shaftBase, top: shaftTop }),
-    towerColor,
-    frame: poly(frameRing, { base: shaftBase, top: shaftTop + 0.4 }),
+    shafts: { type: "FeatureCollection", features: shafts },
+    frame: EMPTY_FC,
     articulation: { type: "FeatureCollection", features: art },
-    crown: { type: "FeatureCollection", features: crownFeatures },
-    core,
-    footprintRing: podiumRing,
+    crown: { type: "FeatureCollection", features: crown },
+    core: EMPTY_FC,
+    footprintRings,
+    scheme: { n: footprints.length, floorsPer: scheme.floorsPer, tier: scheme.tier },
   };
 }
 
 /** Color-by-`kind` match expression builder for the multi-material layers. */
-function matchColor(pal: ReturnType<typeof palette>, group: "podium" | "art" | "crown") {
+function matchColor(pal: ReturnType<typeof palette>, group: "podium" | "art" | "crown" | "shaft") {
+  if (group === "shaft") {
+    return [
+      "match",
+      ["get", "kind"],
+      40,
+      pal.tower,
+      41,
+      pal.towerHi,
+      42,
+      pal.slabBody,
+      43,
+      pal.podium,
+      44,
+      pal.cottageBody,
+      pal.tower,
+    ];
+  }
   if (group === "podium") {
     return [
       "match",
@@ -562,19 +584,23 @@ function matchColor(pal: ReturnType<typeof palette>, group: "podium" | "art" | "
  *  fitBounds works identically on both libraries and animates pitch+bearing in
  *  one call (cameraForBounds is library-divergent — maplibre 5 drops pitch — so
  *  we don't rely on it for the cross-path reveal). */
-function frameToParcel(map: maplibregl.Map, ring: Ring, animate: boolean, duration: number) {
+function frameToParcel(map: maplibregl.Map, ring: Ring, animate: boolean, duration: number, heightM = 0) {
   const [w, s, e, n] = ringBounds(ring);
-  const bounds = new gl.LngLatBounds([w, s], [e, n]);
+  // expand the fit-box by ~the building height so tall towers get headroom and the
+  // camera zooms out enough to see the whole cluster (not just the bases).
+  const padLat = (heightM * 0.85) / 111320;
+  const padLng = padLat * 0.4;
+  const bounds = new gl.LngLatBounds([w - padLng, s - padLat], [e + padLng, n + padLat * 0.5]);
   // three-quarter view of the long facade: long-axis bearing + 30°
   const bearing = (ringOrientationDeg(ring) + 30) % 360;
   map.fitBounds(bounds, {
-    padding: { top: 90, bottom: 70, left: 70, right: 70 }, // keep the setback gap visible
+    padding: { top: 80, bottom: 60, left: 60, right: 60 }, // keep the setback gap visible
     bearing,
-    pitch: 58,
+    pitch: 56,
     maxZoom: 18,
     duration: animate ? duration : 0,
     essential: true,
-    offset: [0, -28], // sit the lot a touch low so the tower has headroom
+    offset: [0, -20], // sit the lot a touch low so the towers have headroom
   } as maplibregl.FitBoundsOptions);
 }
 
@@ -590,47 +616,58 @@ function findClearCentroid(map: maplibregl.Map, center: [number, number], stepM:
   if (!USE_MAPBOX) return center;
   try {
     const style = (map as unknown as { getStyle?: () => { layers?: { id: string; type?: string; "source-layer"?: string }[] } }).getStyle?.();
-    const buildingLayers = (style?.layers ?? [])
+    const layers = style?.layers ?? [];
+    const buildingLayers = layers
       .filter((l) => l["source-layer"] === "building" && (l.type === "fill-extrusion" || l.type === "fill"))
       .map((l) => l.id);
-    if (!buildingLayers.length) return center;
+    buildingLayers.push("context-buildings");
+    // only MAJOR roads count as obstacles (minor streets are everywhere)
+    const roadLayers = layers
+      .filter((l) => l["source-layer"] === "road" && l.type === "line" && /motorway|trunk|primary|secondary/i.test(l.id))
+      .map((l) => l.id);
+    const present = buildingLayers.filter((id) => map.getLayer(id));
+    if (!present.length) return center;
 
-    const score = (c: [number, number]): number => {
-      const px = map.project(c as unknown as maplibregl.LngLatLike);
-      const samples: [number, number][] = [
-        [0, 0],
-        [16, 0],
-        [-16, 0],
-        [0, 16],
-        [0, -16],
-      ];
-      let hits = 0;
-      for (const [dx, dy] of samples) {
-        const f = map.queryRenderedFeatures([px.x + dx, px.y + dy] as unknown as maplibregl.PointLike, {
-          layers: buildingLayers,
-        });
-        if (f.length) hits++;
-      }
-      return hits;
-    };
-
-    if (score(center) === 0) return center; // already clear
     const dLngM = 1 / (111320 * Math.cos((center[1] * Math.PI) / 180));
     const dLatM = 1 / 111320;
+    // score a candidate: 5 footprint samples for buildings (weigh 2×) + 1 road check —
+    // kept light (≈6 queries/candidate) so placement stays snappy.
+    const offs: [number, number][] = [
+      [0, 0],
+      [1, 1],
+      [-1, 1],
+      [1, -1],
+      [-1, -1],
+    ];
+    const score = (c: [number, number]): number => {
+      let buildings = 0;
+      for (const [i, j] of offs) {
+        const px = map.project([c[0] + i * 22 * dLngM, c[1] + j * 22 * dLatM] as maplibregl.LngLatLike);
+        if (map.queryRenderedFeatures([px.x, px.y] as maplibregl.PointLike, { layers: present }).length) buildings++;
+      }
+      let roads = 0;
+      if (roadLayers.length) {
+        const px = map.project(c as maplibregl.LngLatLike);
+        if (map.queryRenderedFeatures([px.x, px.y] as maplibregl.PointLike, { layers: roadLayers }).length) roads = 2;
+      }
+      return buildings * 2 + roads;
+    };
+
     let best = center;
     let bestScore = score(center);
-    for (let r = 1; r <= 3; r++) {
-      for (let a = 0; a < 8; a++) {
-        const ang = (a / 8) * 2 * Math.PI;
+    if (bestScore === 0) return center; // already clear
+    for (let r = 1; r <= 2; r++) {
+      for (let a = 0; a < 6; a++) {
+        const ang = (a / 6) * 2 * Math.PI + (r % 2) * 0.5; // stagger rings
         const cand: [number, number] = [
           center[0] + Math.cos(ang) * stepM * r * dLngM,
           center[1] + Math.sin(ang) * stepM * r * dLatM,
         ];
-        const s = score(cand);
-        if (s < bestScore) {
-          bestScore = s;
+        const sc = score(cand);
+        if (sc < bestScore) {
+          bestScore = sc;
           best = cand;
-          if (s === 0) return best;
+          if (sc === 0) return best;
         }
       }
     }
@@ -648,6 +685,7 @@ export function ProjectMap({
   gush,
   helka,
   floors = 12,
+  units = 0,
   coverageRatio = COVERAGE,
   illustrative = false,
   comparables = [],
@@ -657,10 +695,12 @@ export function ProjectMap({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<maplibregl.Map | null>(null);
   const ringRef = React.useRef<Ring | null>(null);
+  const hiddenRef = React.useRef<Set<string | number>>(new Set()); // demolished context-building ids
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme !== "light";
   const [parcelLive, setParcelLive] = React.useState(false);
   const [scrollHint, setScrollHint] = React.useState(false);
+  const captionScheme = React.useMemo(() => (units > 0 ? pickScheme(units) : null), [units]);
 
   const initialRing = React.useMemo<Ring>(
     () => (parcelRing && parcelRing.length >= 4 ? parcelRing : synthRing(lat, lng, areaSqm)),
@@ -670,25 +710,26 @@ export function ProjectMap({
   const applyParcel = React.useCallback(
     (map: maplibregl.Map, ring: Ring) => {
       ringRef.current = ring;
-      const m = buildMassing(ring, floors, coverageRatio);
+      const m = buildMassing(ring, floors, coverageRatio, units);
       const pal = palette(dark);
       const set = (id: string, data: GeoJSON.GeoJSON) => {
         const src = map.getSource(id) as maplibregl.GeoJSONSource | undefined;
         if (src) src.setData(data);
       };
 
-      // ground-contact shadow: a wide soft halo + a tighter dark core under the
-      // building, so the massing reads as grounded in the lot on BOTH paths.
-      const shadowHalo = insetRing(m.footprintRing, -0.18); // expand outward ~18%
-      const shadowCore = insetRing(m.footprintRing, -0.04);
+      // ground-contact shadow: a wide soft halo + a tighter dark core under EACH
+      // building footprint, so every block reads as grounded in the lot on both paths.
       const shadowData: GeoJSON.FeatureCollection = {
         type: "FeatureCollection",
-        features: [poly(shadowHalo, { soft: 1 }), poly(shadowCore, { soft: 0 })],
+        features: m.footprintRings.flatMap((fr) => [
+          poly(insetRing(fr, -0.18), { soft: 1 }),
+          poly(insetRing(fr, -0.04), { soft: 0 }),
+        ]),
       };
 
       // illustrative volume study: a clean neutral plot under the massing that masks
       // the basemap streets, so the building reads as a study rather than dropped on a road.
-      const groundPad = insetRing(ring, -1.7); // expand the lot outward ~2.7×
+      const groundPad = insetRing(ring, -0.35); // a clean cleared lot — parcel + a small margin
 
       if (!map.getSource("parcel")) {
         if (illustrative) {
@@ -806,14 +847,14 @@ export function ProjectMap({
           : {};
         // edge-radius is the only LAYOUT-block fill-extrusion prop (@experimental).
         const towerLayout = USE_MAPBOX ? { "fill-extrusion-edge-radius": 0.4 } : {};
-        map.addSource("tower", { type: "geojson", data: m.tower });
+        map.addSource("tower", { type: "geojson", data: m.shafts });
         map.addLayer({
           id: "tower-3d",
           type: "fill-extrusion",
           source: "tower",
           layout: towerLayout as unknown as maplibregl.FillExtrusionLayerSpecification["layout"],
           paint: {
-            "fill-extrusion-color": pal.tower,
+            "fill-extrusion-color": matchColor(pal, "shaft") as maplibregl.ExpressionSpecification,
             "fill-extrusion-base": ["get", "base"],
             "fill-extrusion-height": ["get", "top"],
             "fill-extrusion-opacity": 1.0,
@@ -873,16 +914,50 @@ export function ProjectMap({
         set("ground-shadow", shadowData);
         set("podium", m.podium);
         set("frame", m.frame);
-        set("tower", m.tower);
+        set("tower", m.shafts);
         set("articulation", m.articulation);
         set("crown", m.crown);
         set("core", m.core);
-        // re-tint the tower in case the tier changed (block/podium/slender hue)
-        map.setPaintProperty("tower-3d", "fill-extrusion-color", m.towerColor);
+        // material is data-driven (kind → match) so no per-instance re-tint is needed
       }
     },
-    [floors, coverageRatio, dark, illustrative],
+    [floors, units, coverageRatio, dark, illustrative],
   );
+
+  // "Demolish" the existing context buildings that sit on the project's lot (feature-state),
+  // so the synthetic massing reads as a cleared site instead of clipping real buildings.
+  const clearPlot = React.useCallback((map: maplibregl.Map) => {
+    if (!USE_MAPBOX || !map.getLayer("context-buildings") || !ringRef.current) return;
+    try {
+      for (const id of hiddenRef.current) {
+        map.setFeatureState({ source: "composite", sourceLayer: "building", id }, { hide: false });
+      }
+      hiddenRef.current.clear();
+      const ring = ringRef.current;
+      let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity;
+      for (const [lng, lat] of ring) {
+        if (lng < w) w = lng;
+        if (lng > e) e = lng;
+        if (lat < s) s = lat;
+        if (lat > n) n = lat;
+      }
+      // sample a grid over the lot; demolish every building rendered under a sample point
+      const N = 5;
+      for (let i = 0; i <= N; i++) {
+        for (let j = 0; j <= N; j++) {
+          const p = map.project([w + ((e - w) * i) / N, s + ((n - s) * j) / N] as maplibregl.LngLatLike);
+          const feats = map.queryRenderedFeatures([p.x, p.y] as maplibregl.PointLike, { layers: ["context-buildings"] });
+          for (const f of feats) {
+            if (f.id == null) continue;
+            map.setFeatureState({ source: "composite", sourceLayer: "building", id: f.id }, { hide: true });
+            hiddenRef.current.add(f.id);
+          }
+        }
+      }
+    } catch {
+      /* no-op */
+    }
+  }, []);
 
   React.useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -949,26 +1024,30 @@ export function ProjectMap({
         new gl.Marker({ element: el }).setLngLat([c.lng, c.lat]).addTo(map);
       }
 
+      // building height drives how far the camera pulls back (tall clusters need headroom)
+      const frameH = (captionScheme?.floorsPer ?? Math.round(floors)) * FLOOR_H;
       // cinematic reveal: fly into a padded, pitched, lot-oriented frame (2.2s)
-      frameToParcel(map, ringRef.current ?? initialRing, true, 2200);
+      frameToParcel(map, ringRef.current ?? initialRing, true, 2200, frameH);
 
-      // Smart placement: when the location is synthetic (no real gush/helka), nudge
-      // the illustrative massing off existing buildings once tiles are ready.
+      // Once tiles are ready: (1) nudge a synthetic lot off existing buildings, then
+      // (2) demolish the existing buildings that sit on the (final) lot.
       const synthetic = !(gush && helka) && !(parcelRing && parcelRing.length >= 4);
-      if (synthetic && USE_MAPBOX) {
-        map.once("idle", () => {
-          if (!mapRef.current || !ringRef.current) return;
+      map.once("idle", () => {
+        if (!mapRef.current || !ringRef.current) return;
+        if (synthetic && USE_MAPBOX) {
           const c = centroid(ringRef.current);
-          const clear = findClearCentroid(map, c, 35);
+          const clear = findClearCentroid(map, c, 40);
           const dLng = clear[0] - c[0];
           const dLat = clear[1] - c[1];
           if (Math.abs(dLng) > 1e-7 || Math.abs(dLat) > 1e-7) {
             const shifted = ringRef.current.map(([x, y]) => [x + dLng, y + dLat]) as Ring;
             applyParcel(map, shifted);
-            frameToParcel(map, shifted, true, 700);
+            frameToParcel(map, shifted, true, 700, frameH);
           }
-        });
-      }
+        }
+        // demolish on the next idle (after any shift / camera move settles)
+        map.once("idle", () => clearPlot(map));
+      });
 
       if (gush && helka) {
         fetch(`/api/parcel?gush=${encodeURIComponent(gush)}&helka=${encodeURIComponent(helka)}`)
@@ -977,8 +1056,9 @@ export function ProjectMap({
             const ring = d?.parcel?.ring as Ring | undefined;
             if (ring && ring.length >= 3 && mapRef.current) {
               applyParcel(mapRef.current, ring);
-              frameToParcel(mapRef.current, ring, true, 1200); // re-frame to the real parcel
+              frameToParcel(mapRef.current, ring, true, 1200, frameH); // re-frame to the real parcel
               setParcelLive(true);
+              mapRef.current.once("idle", () => clearPlot(mapRef.current!));
             }
           })
           .catch(() => {});
@@ -994,14 +1074,14 @@ export function ProjectMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dark]);
 
-  // live-update massing when the floor count changes — keep the current (live) ring
+  // live-update massing when the floor count or unit scheme changes — keep the live ring
   React.useEffect(() => {
     const map = mapRef.current;
     if (map && map.isStyleLoaded() && map.getSource("tower") && ringRef.current) {
       applyParcel(map, ringRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [floors]);
+  }, [floors, units]);
 
   return (
     <div className={className} style={{ position: "relative", width: "100%", height: "100%", minHeight: 320 }}>
@@ -1013,7 +1093,9 @@ export function ProjectMap({
         </div>
       )}
       <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-full bg-black/55 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">
-        {Math.round(floors)} קומות · ~{Math.round(floors * FLOOR_H)} מ׳
+        {captionScheme && captionScheme.n > 1
+          ? `${captionScheme.n} בניינים · ${captionScheme.floorsPer} קומות`
+          : `${Math.round(captionScheme?.floorsPer ?? floors)} קומות · ~${Math.round((captionScheme?.floorsPer ?? floors) * FLOOR_H)} מ׳`}
       </div>
       <div
         className={`pointer-events-none absolute inset-0 z-20 grid place-items-center transition-opacity duration-200 ${scrollHint ? "opacity-100" : "opacity-0"}`}

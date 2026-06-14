@@ -347,6 +347,7 @@ export function ProjectWorkspace(props: WorkspaceProps) {
                   gush={props.gush}
                   helka={props.helka}
                   floors={massingFloors}
+                  units={det.rights.units}
                   coverageRatio={COVERAGE}
                   comparables={props.comparables.filter((c) => c.lat && c.lng).slice(0, 12)}
                 />

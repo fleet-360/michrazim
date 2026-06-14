@@ -32,7 +32,7 @@ export function TenderMassingPreview({ t, precise = false }: { t: RmiTender; pre
 
   return (
     <div className="relative h-full w-full">
-      <DynamicMap lat={t.lat} lng={t.lng} areaSqm={areaSqm} floors={floors} coverageRatio={0.42} illustrative />
+      <DynamicMap lat={t.lat} lng={t.lng} areaSqm={areaSqm} floors={floors} units={units} coverageRatio={0.42} illustrative />
       <div className="pointer-events-none absolute right-3 top-3 z-10 rounded-full bg-black/65 px-2.5 py-1 text-xs font-medium text-white backdrop-blur">
         {precise ? "הדמיית נפח · מיקום מקורב לשכונה" : "הדמיית נפח להמחשה · לא מיקום מדויק"}
       </div>

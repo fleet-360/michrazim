@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseHebDate } from "./rmi";
+import { parseHebDate, toListItem, type RmiTender } from "./rmi";
 import { itmToWgs84, parseCbsCoords } from "./itm";
 
 describe("parseHebDate", () => {
@@ -44,5 +44,43 @@ describe("itm geocoding (EPSG:2039 → WGS84)", () => {
     expect(parseCbsCoords("123")).toBeNull();
     expect(parseCbsCoords("000000000000")).toBeNull(); // zero easting/northing
     expect(parseCbsCoords("2104074200")).toBeNull(); // 10-digit anomaly → safe reject
+  });
+});
+
+describe("toListItem (lightweight list payload)", () => {
+  const full: RmiTender = {
+    id: "ur-1",
+    source: "live",
+    name: "מתחם",
+    city: "לוד",
+    units: 500,
+    status: "תכנון",
+    url: "https://mavat",
+    kind: "renewal",
+    category: "renewal",
+    track: "URBAN_RENEWAL",
+    mavatUrl: "https://mavat.example",
+    govmapUrl: "https://govmap.example",
+    landGovUrl: "https://land.example",
+    oldByNewCost: 12345,
+    planNumber: "תמל/1",
+  };
+
+  it("strips detail-only heavy fields but keeps the display fields", () => {
+    const lite = toListItem(full);
+    expect("mavatUrl" in lite).toBe(false);
+    expect("govmapUrl" in lite).toBe(false);
+    expect("landGovUrl" in lite).toBe(false);
+    expect("oldByNewCost" in lite).toBe(false);
+    // kept
+    expect(lite.id).toBe("ur-1");
+    expect(lite.category).toBe("renewal");
+    expect(lite.planNumber).toBe("תמל/1");
+    expect(lite.units).toBe(500);
+  });
+
+  it("does not mutate the original", () => {
+    toListItem(full);
+    expect(full.mavatUrl).toBe("https://mavat.example");
   });
 });

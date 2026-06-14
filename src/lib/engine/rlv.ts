@@ -12,6 +12,10 @@ import { computeBaseFinancing } from "./financing";
 import { expected } from "./distributions";
 import { computeCashflow } from "./cashflow";
 
+// In פינוי-בינוי tenants get a re-built apartment ~15% larger than their old one
+// (the standard betterment). That extra area comes out of sellable stock.
+const TENANT_BETTERMENT = 1.15;
+
 /** Resolved scalar values for one scenario (deterministic or one MC draw). */
 export interface Scenario {
   salePricePerSqm: number;
@@ -63,9 +67,24 @@ export function computeScenarioCore(
 ): ScenarioCore {
   const rights = computeRights(inputs.rights);
 
-  const residentialRev = rights.sellableResidentialSqm * scn.salePricePerSqm;
+  // URBAN RENEWAL: the developer BUILDS every unit but only SELLS the net new ones —
+  // the existing tenants receive (re-)built apartments (with a betterment uplift) that
+  // are NOT sold. So their floor area and parking are removed from revenue, while their
+  // full construction cost stays in. (Charging tenant *apartment value* as a cash cost
+  // AND booking its sale was a double count that made every renewal look unprofitable.)
+  const isUrban = inputs.track === "URBAN_RENEWAL";
+  const tenantUnits = isUrban ? Math.max(0, inputs.existingUnits ?? 0) : 0;
+  const tenantResidentialSqm = Math.min(
+    rights.sellableResidentialSqm,
+    tenantUnits * inputs.rights.avgUnitSizeSqm * TENANT_BETTERMENT,
+  );
+  const tenantParking = Math.min(rights.parkingSpaces, Math.round(tenantUnits * inputs.rights.parkingRatio));
+  const netSellableResidentialSqm = rights.sellableResidentialSqm - tenantResidentialSqm;
+  const netParkingSpaces = rights.parkingSpaces - tenantParking;
+
+  const residentialRev = netSellableResidentialSqm * scn.salePricePerSqm;
   const commercialRev = rights.sellableCommercialSqm * scn.commercialPricePerSqm;
-  const parkingRev = rights.parkingSpaces * inputs.parkingSalePrice;
+  const parkingRev = netParkingSpaces * inputs.parkingSalePrice;
   const revenue = residentialRev + commercialRev + parkingRev;
 
   const construction = rights.totalBuiltSqm * scn.constructionCostPerSqm;

@@ -181,3 +181,41 @@ describe("analyzeDeal end-to-end", () => {
     expect(last.cumulative).toBeCloseTo(analysis.cashflow.profit, 2);
   });
 });
+
+describe("urban renewal — tenant units are built but not sold (no double count)", () => {
+  const urban = (existingUnits?: number) =>
+    makeDeal({
+      track: "URBAN_RENEWAL",
+      existingUnits,
+      rights: {
+        plotAreaSqm: 5000,
+        far: 4.5,
+        serviceAreaRatio: 0.34,
+        efficiencyRatio: 0.82,
+        avgUnitSizeSqm: 92,
+        parkingRatio: 1.1,
+        commercialSqm: 0,
+      },
+    });
+
+  it("removes tenant apartments (with betterment) from sellable revenue", () => {
+    const none = computeScenarioCore(urban(0), schedule, expectedScenario(urban(0)));
+    const some = computeScenarioCore(urban(50), schedule, expectedScenario(urban(50)));
+    expect(some.revenue).toBeLessThan(none.revenue);
+    // 50 units × 92 m² × 1.15 betterment × ₪28,000 are taken out of residential revenue
+    const drop = none.revenueBreakdown.residential - some.revenueBreakdown.residential;
+    expect(drop).toBeCloseTo(50 * 92 * 1.15 * 28000, -5);
+  });
+
+  it("a stronger added-units ratio (fewer tenants on the same build) is more profitable", () => {
+    const strong = analyzeDeal(urban(40), schedule, { bid: 0, runs: 200 });
+    const weak = analyzeDeal(urban(140), schedule, { bid: 0, runs: 200 });
+    expect(strong.bidEvaluation.marginOnCost).toBeGreaterThan(weak.bidEvaluation.marginOnCost);
+  });
+
+  it("does NOT touch the RMI track (existingUnits has no effect there)", () => {
+    const withTenants = computeScenarioCore(makeDeal({ existingUnits: 50 }), schedule, expectedScenario(makeDeal()));
+    const without = computeScenarioCore(makeDeal({ existingUnits: 0 }), schedule, expectedScenario(makeDeal()));
+    expect(withTenants.revenue).toBeCloseTo(without.revenue, 5);
+  });
+});

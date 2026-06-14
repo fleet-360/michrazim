@@ -18,9 +18,12 @@ export interface TemplateParams {
  * ± uncertainty bands so the Monte-Carlo is meaningful out of the box.
  */
 export function buildInputsFromTemplate(p: TemplateParams): DealInputs {
-  const sale = p.avgPricePerSqm;
   const isUrban = p.track === "URBAN_RENEWAL";
   const isRmi = p.track === "RMI";
+  // Renewal delivers BRAND-NEW apartments, which sell above the city's blended
+  // average (that average folds in old stock). A ~12% new-build premium is the
+  // realistic anchor for the sale price of the net new units.
+  const sale = isUrban ? Math.round(p.avgPricePerSqm * 1.12) : p.avgPricePerSqm;
 
   // construction cost scales mildly with price level (premium finishes in pricier areas)
   const cc = Math.round(7600 + (sale - 22000) * 0.06);
@@ -63,7 +66,11 @@ export function buildInputsFromTemplate(p: TemplateParams): DealInputs {
     ...(isUrban
       ? {
           existingUnits: p.existingUnits ?? 40,
-          tenantCompensationPerUnit: 1_950_000,
+          // CASH rehousing cost per tenant only — moving grants, betterment top-ups and
+          // legal/accompaniment. The new apartment itself is captured as construction
+          // cost + foregone sale (its area is removed from sellable in rlv.ts), so it is
+          // NOT also paid here as a ~₪2M cash sum (that double count sank every renewal).
+          tenantCompensationPerUnit: 280_000,
           tenantRentMonths: 44,
           tenantRentPerUnit: 7500,
         }

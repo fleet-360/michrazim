@@ -12,13 +12,27 @@ import { CATEGORY_META, massingUnits, tenderHasUnits } from "@/lib/tender-displa
 import { formatShekelShort, formatNumber, formatPct } from "@/lib/utils";
 import type { RmiTender } from "@/lib/data/rmi";
 
+export type TenderVerdict = "GO" | "CONDITIONAL" | "NO_GO";
+
 export interface TenderEstimate {
-  residual: number;
-  recommendedBid: number;
-  probabilityOfLoss: number;
-  marginOnCost: number;
+  /** "land" = RMI/tender (you bid for land); "renewal" = pinui-binui (no land bid). */
+  kind: "land" | "renewal";
   units: number;
+  marginOnCost: number;
+  probabilityOfLoss: number;
+  // land track
+  residual?: number;
+  recommendedBid?: number;
+  // renewal track
+  profit?: number;
+  verdict?: TenderVerdict;
 }
+
+const VERDICT_META: Record<TenderVerdict, { label: string; badge: "success" | "warning" | "secondary" }> = {
+  GO: { label: "כדאי", badge: "success" },
+  CONDITIONAL: { label: "כדאי בתנאים", badge: "warning" },
+  NO_GO: { label: "לא כדאי כעת", badge: "secondary" },
+};
 
 export function TenderDetail({
   t,
@@ -85,21 +99,45 @@ export function TenderDetail({
           {estimate && (
             <Card className="border-primary/25 bg-primary/[0.04]">
               <CardContent className="space-y-3 p-5">
-                <div className="flex items-center gap-2 font-display font-semibold">
-                  <Gauge className="size-4 text-primary" />
-                  אומדן ראשוני
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 font-display font-semibold">
+                    <Gauge className="size-4 text-primary" />
+                    אומדן ראשוני
+                  </div>
+                  {estimate.kind === "renewal" && estimate.verdict && (
+                    <Badge variant={VERDICT_META[estimate.verdict].badge}>{VERDICT_META[estimate.verdict].label}</Badge>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <Stat label="שווי קרקע שיורי" value={formatShekelShort(estimate.residual)} />
-                  <Stat label="הצעה מומלצת" value={formatShekelShort(estimate.recommendedBid)} />
-                  <Stat label="מרווח על העלות" value={formatPct(estimate.marginOnCost)} />
-                  <Stat label="הסתברות הפסד" value={formatPct(estimate.probabilityOfLoss)} />
-                </div>
-                <p className="flex items-start gap-2 text-xs text-muted-foreground">
-                  <Info className="mt-0.5 size-3.5 shrink-0" />
-                  אומדן על בסיס {formatNumber(estimate.units)} יח״ד והנחות ענף ברירת-מחדל (עלויות, מחיר מכירה, לו״ז,
-                  מימון). בחיתום המלא תוכלו לכוונן כל הנחה ולהריץ מונטה-קרלו אינטראקטיבי.
-                </p>
+                {estimate.kind === "renewal" ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <Stat label="רווח יזמי צפוי" value={formatShekelShort(estimate.profit ?? 0)} />
+                      <Stat label="מרווח על העלות" value={formatPct(estimate.marginOnCost)} />
+                      <Stat label="הסתברות הפסד" value={formatPct(estimate.probabilityOfLoss)} />
+                    </div>
+                    <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <Info className="mt-0.5 size-3.5 shrink-0" />
+                      בהתחדשות עירונית אין רכישת קרקע — הקרקע מגיעה מהדיירים, ולכן מוצג <b>רווח יזמי</b> ו<b>מרווח על
+                      העלות</b> במקום הצעת מחיר לקרקע. הכדאיות נגזרת בעיקר מיחס היחידות המתווספות (יעד מול קיים) ומרמת
+                      המחירים באזור. אומדן על בסיס {formatNumber(estimate.units)} יח״ד והנחות ברירת-מחדל — בחיתום המלא
+                      תוכלו לכוונן כל הנחה.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <Stat label="שווי קרקע שיורי" value={formatShekelShort(estimate.residual ?? 0)} />
+                      <Stat label="הצעה מומלצת" value={formatShekelShort(estimate.recommendedBid ?? 0)} />
+                      <Stat label="מרווח על העלות" value={formatPct(estimate.marginOnCost)} />
+                      <Stat label="הסתברות הפסד" value={formatPct(estimate.probabilityOfLoss)} />
+                    </div>
+                    <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <Info className="mt-0.5 size-3.5 shrink-0" />
+                      אומדן על בסיס {formatNumber(estimate.units)} יח״ד והנחות ענף ברירת-מחדל (עלויות, מחיר מכירה, לו״ז,
+                      מימון). בחיתום המלא תוכלו לכוונן כל הנחה ולהריץ מונטה-קרלו אינטראקטיבי.
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}

@@ -32,16 +32,32 @@ export default async function TenderPage({ params }: { params: Promise<{ id: str
   let estimate: TenderEstimate | null = null;
   try {
     const { inputs } = buildTenderDeal(tender, avgPrice);
-    const probe = analyzeProject({ inputs, city: tender.city, bid: 0, riskAppetite: 0.4 }, cities, { runs: 1000 });
-    const recBid = probe.recommendation.recommendedBid;
-    const atRec = analyzeProject({ inputs, city: tender.city, bid: recBid, riskAppetite: 0.4 }, cities, { runs: 1000 });
-    estimate = {
-      residual: probe.deterministic.maxLandValue,
-      recommendedBid: recBid,
-      probabilityOfLoss: atRec.monteCarlo.probabilityOfLoss,
-      marginOnCost: atRec.bidEvaluation.marginOnCost,
-      units: probe.deterministic.rights.units,
-    };
+    // Urban renewal (פינוי-בינוי) has NO land bid — the land comes from the tenants.
+    // So we report the developer's profit & margin at bid 0, not a "residual land
+    // value" / "recommended bid" (which would always read as ₪0 and mislead).
+    if (tender.track === "URBAN_RENEWAL") {
+      const a = analyzeProject({ inputs, city: tender.city, bid: 0, riskAppetite: 0.4 }, cities, { runs: 1000 });
+      estimate = {
+        kind: "renewal",
+        units: a.deterministic.rights.units,
+        profit: a.bidEvaluation.profit,
+        marginOnCost: a.bidEvaluation.marginOnCost,
+        probabilityOfLoss: a.monteCarlo.probabilityOfLoss,
+        verdict: a.verdict,
+      };
+    } else {
+      const probe = analyzeProject({ inputs, city: tender.city, bid: 0, riskAppetite: 0.4 }, cities, { runs: 1000 });
+      const recBid = probe.recommendation.recommendedBid;
+      const atRec = analyzeProject({ inputs, city: tender.city, bid: recBid, riskAppetite: 0.4 }, cities, { runs: 1000 });
+      estimate = {
+        kind: "land",
+        units: probe.deterministic.rights.units,
+        residual: probe.deterministic.maxLandValue,
+        recommendedBid: recBid,
+        probabilityOfLoss: atRec.monteCarlo.probabilityOfLoss,
+        marginOnCost: atRec.bidEvaluation.marginOnCost,
+      };
+    }
   } catch {
     estimate = null;
   }

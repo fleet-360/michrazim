@@ -5,9 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Stat } from "@/components/tenders/stat";
 import { TenderMassingPreview } from "@/components/tenders/tender-massing-preview";
+import { MassingRationale } from "@/components/tenders/massing-rationale";
 import { TenderImportButton } from "@/components/tenders/tender-import-button";
 import { WatchButton } from "@/components/tenders/watch-button";
-import { CATEGORY_META } from "@/lib/tender-display";
+import { CATEGORY_META, massingUnits, tenderHasUnits } from "@/lib/tender-display";
 import { formatShekelShort, formatNumber, formatPct } from "@/lib/utils";
 import type { RmiTender } from "@/lib/data/rmi";
 
@@ -158,6 +159,12 @@ export function TenderDetail({
             <div className="h-[300px]">
               <TenderMassingPreview t={t} precise={preciseLocation} />
             </div>
+            {t.lat != null && t.lng != null && (
+              <MassingRationale
+                units={massingUnits(t)}
+                source={tenderHasUnits(t) ? "tender" : "default"}
+              />
+            )}
             {links.length > 0 && (
               <div className="flex flex-wrap gap-2 border-t border-border p-4">
                 {links.map((l) => (

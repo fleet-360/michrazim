@@ -9,6 +9,88 @@ export type Ring = [number, number][];
  *  bundle past the `next/dynamic` boundary in dynamic-map.tsx. */
 export const FLOOR_H = 3.3; // meters per floor
 export const COVERAGE = 0.42; // תכסית — building-coverage ratio
+export const UNITS_PER_FLOOR = 4; // typical Israeli residential core (3–6 units/floor)
+
+const clampInt = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(x)));
+
+/** Building typology — drives footprint shape, material and crown. */
+export type Tier = "cottage" | "block" | "slab" | "tower" | "towerHi";
+
+export interface Scheme {
+  n: number; // number of buildings
+  floorsPer: number; // floors per building
+  tier: Tier;
+  podium: boolean;
+}
+
+/**
+ * Choose a realistic typology, building COUNT and per-building floor count from the
+ * project's actual unit total — so 12 units reads as a low block, ~150 as a few
+ * mid-rise slabs, and a big urban-renewal scheme as a cluster of towers on a podium.
+ * Pure + side-effect-free so both the 3D massing AND the on-screen rationale below
+ * derive from the SAME numbers (they can never disagree).
+ */
+export function pickScheme(units: number): Scheme {
+  const U = Math.max(1, Math.round(units));
+  if (U <= 4) return { n: Math.min(2, Math.max(1, U)), floorsPer: 2, tier: "cottage", podium: false };
+  if (U <= 28) return { n: 1, floorsPer: clampInt(U / UNITS_PER_FLOOR, 3, 8), tier: "block", podium: false };
+  if (U <= 80) return { n: 2, floorsPer: clampInt(U / (2 * UNITS_PER_FLOOR), 4, 9), tier: "block", podium: false };
+  if (U <= 180) return { n: 3, floorsPer: clampInt(U / (3 * UNITS_PER_FLOOR), 5, 12), tier: "slab", podium: false };
+  if (U <= 450) return { n: 4, floorsPer: clampInt(U / (4 * 5), 10, 24), tier: "tower", podium: true };
+  const n = clampInt(U / 600, 5, 6);
+  return { n, floorsPer: clampInt(U / (n * 6), 18, 42), tier: "towerHi", podium: true };
+}
+
+const TIER_HE: Record<Tier, string> = {
+  cottage: "בנייה צמודת-קרקע",
+  block: "בניין מגורים",
+  slab: "בנייני שורה",
+  tower: "מגדלי מגורים",
+  towerHi: "מגדלים גבוהים",
+};
+
+export interface SchemeExplanation {
+  /** e.g. "4 בניינים בני 18 קומות" */
+  label: string;
+  /** how the count/height were derived from the unit total */
+  reason: string;
+  /** the honesty line — what is real (units) vs. an illustrative estimate */
+  transparency: string;
+}
+
+/** Where the unit total came from — drives the honesty line. */
+export type UnitsSource = "tender" | "rights" | "default";
+
+/**
+ * Plain-language, HONEST explanation of why a given massing was chosen. The unit
+ * total is the only real input; the building split, typology and height are an
+ * illustrative estimate — say so explicitly so the user is never misled.
+ */
+export function describeScheme(
+  units: number,
+  opts: { source?: UnitsSource } = {},
+): SchemeExplanation {
+  const s = pickScheme(units);
+  const U = Math.max(1, Math.round(units));
+  const nis = (x: number) => x.toLocaleString("he-IL");
+  const typ = TIER_HE[s.tier];
+  const label = s.n > 1 ? `${s.n} בניינים בני ${s.floorsPer} קומות` : `בניין בן ${s.floorsPer} קומות`;
+
+  const perBuilding = Math.round(U / s.n);
+  const reason =
+    s.n > 1
+      ? `נגזר מ-${nis(U)} יח״ד: בטיפולוגיה ישראלית טיפוסית של כ-${UNITS_PER_FLOOR} יח״ד לקומה, חלוקה ל-${s.n} ${typ} (כ-${nis(perBuilding)} יח״ד לכל אחד) שומרת על תכסית קרקע ופרופורציה סבירה — במקום מגדל-ענק יחיד.`
+      : `נגזר מ-${nis(U)} יח״ד: בטיפולוגיה ישראלית טיפוסית של כ-${UNITS_PER_FLOOR} יח״ד לקומה, מתקבל ${typ} בן ${s.floorsPer} קומות.`;
+
+  const transparency =
+    opts.source === "tender"
+      ? `מספר יחידות הדיור נלקח מנתוני המכרז. חלוקת הבניינים, הגובה והמיקום המדויק הם הערכת המחשה — לא נתון רשמי מהמכרז.`
+      : opts.source === "rights"
+        ? `מספר יחידות הדיור חושב מזכויות הבנייה על המגרש (שטח × אחוזי בנייה). חלוקת הבניינים והגובה הן הערכת המחשה ויזואלית.`
+        : `המכרז אינו מפרסם מספר יח״ד, לכן זוהי הנחת ברירת-מחדל (${nis(U)} יח״ד) להמחשה בלבד — לא נתון מהמכרז.`;
+
+  return { label, reason, transparency };
+}
 
 const EPS = 1e-9;
 const MPD_LAT = 111_320; // meters per degree latitude (good to <0.5% over Israel)
@@ -32,13 +114,15 @@ export function insetRing(ring: Ring, factor: number): Ring {
   return ring.map(([lng, lat]) => [lng + (cx - lng) * factor, lat + (cy - lat) * factor]);
 }
 
-/** Build a synthetic, slightly rotated parcel of `areaSqm` around a point. */
-export function synthRing(lat: number, lng: number, areaSqm: number): Ring {
+/** Build a synthetic parcel of `areaSqm` around a point, rotated by `rotRad`
+ *  (radians, CCW). Default ≈0.2 rad keeps it off axis-aligned; the caller passes
+ *  the local street-grid angle so the lot lines up with the surrounding block. */
+export function synthRing(lat: number, lng: number, areaSqm: number, rotRad = 0.2): Ring {
   const side = Math.sqrt(Math.max(areaSqm, 100));
   const half = side / 2;
   const dLat = half / 111320;
   const dLng = half / (111320 * Math.cos((lat * Math.PI) / 180));
-  const rot = 0.2;
+  const rot = rotRad;
   const pts: Ring = [
     [-dLng, -dLat],
     [dLng, -dLat],

@@ -2,6 +2,7 @@
 
 import { MapPinned } from "lucide-react";
 import { DynamicMap } from "@/components/map/dynamic-map";
+import { massingUnits } from "@/lib/tender-display";
 import type { RmiTender } from "@/lib/data/rmi";
 
 /**
@@ -22,7 +23,7 @@ export function TenderMassingPreview({ t, precise = false }: { t: RmiTender; pre
   }
 
   const far = t.track === "URBAN_RENEWAL" ? 4.5 : 3.0;
-  const units = Math.max(8, t.targetUnits || t.units || 40);
+  const units = massingUnits(t);
   // Plot sized to the unit count, but CAPPED so a huge project (e.g. a 9,500-unit
   // renewal) doesn't render as an absurd 500 m slab. Past the cap, density is
   // expressed as HEIGHT instead — a believable tall tower study, not a flat block.

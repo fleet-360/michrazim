@@ -20,6 +20,8 @@ import {
   ringOrientationDeg,
   FLOOR_H,
   COVERAGE,
+  pickScheme,
+  type Tier,
   type Ring,
 } from "./geo";
 import { CheckCircle2 } from "lucide-react";
@@ -290,11 +292,17 @@ function addContextBuildings(map: maplibregl.Map, dark: boolean) {
       // collapse to 0 height when feature-state `hide` is set — we "demolish" the
       // existing buildings that sit on the project's lot so the massing reads as a
       // cleared development site rather than clipping through real buildings.
+      // NOTE: the spec requires `zoom` to be the TOP-LEVEL input to interpolate, so
+      // the `hide` case must live INSIDE the interpolate output (not wrap it) — the
+      // old wrapping form threw a style error and the layer never got added.
       "fill-extrusion-height": [
-        "case",
-        ["boolean", ["feature-state", "hide"], false],
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        14.5,
         0,
-        ["interpolate", ["linear"], ["zoom"], 14.5, 0, 15.5, ["coalesce", ["get", "height"], 6]],
+        15.5,
+        ["case", ["boolean", ["feature-state", "hide"], false], 0, ["coalesce", ["get", "height"], 6]],
       ] as unknown as maplibregl.ExpressionSpecification,
       "fill-extrusion-base": ["coalesce", ["get", "min_height"], 0] as unknown as maplibregl.ExpressionSpecification,
       "fill-extrusion-opacity": dark ? 0.82 : 0.9,
@@ -314,10 +322,10 @@ function addContextBuildings(map: maplibregl.Map, dark: boolean) {
  *  expression — keeps the layer count tiny and `setData`-friendly. */
 
 const MAX_FLOOR_BANDS = 28; // hard perf cap on floor-reveal features (total across buildings)
-const UNITS_PER_FLOOR = 4; // typical Israeli residential core (3–6 units/floor)
 
-/** Building typology — drives footprint shape, material and crown. */
-type Tier = "cottage" | "block" | "slab" | "tower" | "towerHi";
+// Building typology (Tier) and the unit→scheme picker now live in ./geo (the light,
+// side-effect-free module) so the on-screen rationale can derive the SAME numbers
+// without pulling the heavy maplibre bundle. Material/aspect maps stay here.
 const TIER_KIND: Record<Tier, number> = { tower: 40, towerHi: 41, slab: 42, block: 43, cottage: 44 };
 const TIER_ASPECT: Record<Tier, number> = { cottage: 1.2, block: 1.5, slab: 2.6, tower: 1.15, towerHi: 1.1 };
 
@@ -362,22 +370,6 @@ function floorReveals(
 }
 
 const clampI = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(x)));
-
-/**
- * Choose a realistic typology, building COUNT and per-building floor count from the
- * tender's actual unit total — so 12 units reads as a low block, ~150 as a few
- * mid-rise slabs, and a big urban-renewal scheme as a cluster of towers on a podium.
- */
-function pickScheme(units: number): { n: number; floorsPer: number; tier: Tier; podium: boolean } {
-  const U = Math.max(1, Math.round(units));
-  if (U <= 4) return { n: Math.min(2, Math.max(1, U)), floorsPer: 2, tier: "cottage", podium: false };
-  if (U <= 28) return { n: 1, floorsPer: clampI(U / UNITS_PER_FLOOR, 3, 8), tier: "block", podium: false };
-  if (U <= 80) return { n: 2, floorsPer: clampI(U / (2 * UNITS_PER_FLOOR), 4, 9), tier: "block", podium: false };
-  if (U <= 180) return { n: 3, floorsPer: clampI(U / (3 * UNITS_PER_FLOOR), 5, 12), tier: "slab", podium: false };
-  if (U <= 450) return { n: 4, floorsPer: clampI(U / (4 * 5), 10, 24), tier: "tower", podium: true };
-  const n = clampI(U / 600, 5, 6);
-  return { n, floorsPer: clampI(U / (n * 6), 18, 42), tier: "towerHi", podium: true };
-}
 
 /**
  * Lay out `n` building footprints in a grid inside `container`, aligned to the lot's
@@ -447,13 +439,26 @@ function gridFootprints(
  * tower), so the building sits believably inside the lot with a real setback gap
  * and the tower runs along the lot's long axis.
  */
-function buildMassing(ring: Ring, floors: number, coverageRatio = COVERAGE, units = 0): Massing {
+function buildMassing(
+  ring: Ring,
+  floors: number,
+  coverageRatio = COVERAGE,
+  units = 0,
+  orientRad?: number,
+): Massing {
   const c = centroid(ring);
   const frame = meterFrame(c[0], c[1]);
   const plotArea = absAreaM2(ring, frame);
   const offset = insetMeters(ring, SETBACK_M, 0.25, frame);
   const offsetArea = absAreaM2(offset, frame);
-  const axis = principalAxis(ring, frame);
+  // A square synthetic lot has a degenerate principal axis (4-fold symmetry), so
+  // PCA can't recover its rotation. When the caller knows the target orientation
+  // (the local street-grid angle), use it directly so the blocks line up with the
+  // surrounding streets; otherwise fall back to the parcel's own long axis.
+  const axis =
+    orientRad != null
+      ? { dir: [Math.cos(orientRad), Math.sin(orientRad)] as [number, number], angleRad: orientRad, elongation: 1 }
+      : principalAxis(ring, frame);
 
   // unit-driven scheme; fall back to a floor-derived single building when units unknown
   const scheme =
@@ -584,15 +589,26 @@ function matchColor(pal: ReturnType<typeof palette>, group: "podium" | "art" | "
  *  fitBounds works identically on both libraries and animates pitch+bearing in
  *  one call (cameraForBounds is library-divergent — maplibre 5 drops pitch — so
  *  we don't rely on it for the cross-path reveal). */
-function frameToParcel(map: maplibregl.Map, ring: Ring, animate: boolean, duration: number, heightM = 0) {
+function frameToParcel(
+  map: maplibregl.Map,
+  ring: Ring,
+  animate: boolean,
+  duration: number,
+  heightM = 0,
+  orientRad?: number,
+) {
   const [w, s, e, n] = ringBounds(ring);
   // expand the fit-box by ~the building height so tall towers get headroom and the
   // camera zooms out enough to see the whole cluster (not just the bases).
   const padLat = (heightM * 0.85) / 111320;
   const padLng = padLat * 0.4;
   const bounds = new gl.LngLatBounds([w - padLng, s - padLat], [e + padLng, n + padLat * 0.5]);
-  // three-quarter view of the long facade: long-axis bearing + 30°
-  const bearing = (ringOrientationDeg(ring) + 30) % 360;
+  // three-quarter view of the long facade: long-axis bearing + 30°. When an explicit
+  // orientation is supplied (square lot → PCA degenerate), derive the compass bearing
+  // from it; otherwise read the parcel's long axis.
+  const longAxisDeg =
+    orientRad != null ? ((90 - (orientRad * 180) / Math.PI) % 360 + 360) % 360 : ringOrientationDeg(ring);
+  const bearing = (longAxisDeg + 30) % 360;
   map.fitBounds(bounds, {
     padding: { top: 80, bottom: 60, left: 60, right: 60 }, // keep the setback gap visible
     bearing,
@@ -677,6 +693,83 @@ function findClearCentroid(map: maplibregl.Map, center: [number, number], stepM:
   }
 }
 
+/**
+ * Dominant street-grid bearing around `center`, in radians (meter-space, CCW from
+ * east), or null if no roads are nearby. Real lots line up with their street block,
+ * so we read the live road network: bin every nearby road segment's direction into
+ * a length-weighted circular mean folded to 90° (a rectangular grid has two
+ * perpendicular families), then pick whichever of the two families carries more
+ * road length as the long-axis direction. The synthetic lot is rotated to match,
+ * so the massing sits ALONG the streets instead of cutting across them.
+ */
+function dominantGridAngle(map: maplibregl.Map, center: [number, number]): number | null {
+  if (!USE_MAPBOX) return null;
+  try {
+    const style = (map as unknown as { getStyle?: () => { layers?: { id: string; type?: string; "source-layer"?: string }[] } }).getStyle?.();
+    const layers = style?.layers ?? [];
+    const roadLayers = layers
+      .filter((l) => l["source-layer"] === "road" && l.type === "line")
+      .map((l) => l.id)
+      .filter((id) => map.getLayer(id));
+    if (!roadLayers.length) return null;
+
+    const mPerLng = 111320 * Math.cos((center[1] * Math.PI) / 180);
+    const R = 200; // sample a ~200 m radius around the lot
+    const dLngM = 1 / mPerLng;
+    const dLatM = 1 / 111320;
+    const p1 = map.project([center[0] - R * dLngM, center[1] - R * dLatM] as maplibregl.LngLatLike);
+    const p2 = map.project([center[0] + R * dLngM, center[1] + R * dLatM] as maplibregl.LngLatLike);
+    const box: [maplibregl.PointLike, maplibregl.PointLike] = [
+      [Math.min(p1.x, p2.x), Math.min(p1.y, p2.y)],
+      [Math.max(p1.x, p2.x), Math.max(p1.y, p2.y)],
+    ];
+    const feats = map.queryRenderedFeatures(box, { layers: roadLayers });
+    if (!feats.length) return null;
+
+    // length-weighted 4θ vector sum → robust grid alignment (mod 90°)
+    let sx = 0;
+    let sy = 0;
+    const segs: { ang: number; len: number }[] = [];
+    const acc = (coords: number[][]) => {
+      for (let i = 0; i < coords.length - 1; i++) {
+        const dx = (coords[i + 1][0] - coords[i][0]) * mPerLng;
+        const dy = (coords[i + 1][1] - coords[i][1]) * 111320;
+        const len = Math.hypot(dx, dy);
+        if (len < 4) continue; // skip tiny zig-zag vertices
+        const ang = Math.atan2(dy, dx);
+        sx += Math.cos(4 * ang) * len;
+        sy += Math.sin(4 * ang) * len;
+        segs.push({ ang, len });
+      }
+    };
+    for (const f of feats) {
+      const g = f.geometry as GeoJSON.Geometry | undefined;
+      if (!g) continue;
+      if (g.type === "LineString") acc(g.coordinates as number[][]);
+      else if (g.type === "MultiLineString") for (const c of g.coordinates as number[][][]) acc(c);
+    }
+    if (!segs.length || (sx === 0 && sy === 0)) return null;
+    const grid = Math.atan2(sy, sx) / 4; // in [-π/4, π/4] — one grid family
+
+    // choose the long-axis family: compare total road length aligned with `grid`
+    // vs the perpendicular `grid + 90°` (each road direction folds mod 180°).
+    const foldHalfPi = (a: number) => {
+      let d = ((a % Math.PI) + Math.PI) % Math.PI; // [0, π)
+      if (d > Math.PI / 2) d = Math.PI - d; // [0, π/2]
+      return d;
+    };
+    let lenAlong = 0;
+    let lenAcross = 0;
+    for (const { ang, len } of segs) {
+      if (foldHalfPi(ang - grid) < Math.PI / 4) lenAlong += len;
+      else lenAcross += len;
+    }
+    return lenAlong >= lenAcross ? grid : grid + Math.PI / 2;
+  } catch {
+    return null;
+  }
+}
+
 export function ProjectMap({
   lat,
   lng,
@@ -695,6 +788,7 @@ export function ProjectMap({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<maplibregl.Map | null>(null);
   const ringRef = React.useRef<Ring | null>(null);
+  const orientRef = React.useRef<number | undefined>(undefined); // street-grid angle of the synthetic lot
   const hiddenRef = React.useRef<Set<string | number>>(new Set()); // demolished context-building ids
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme !== "light";
@@ -708,9 +802,10 @@ export function ProjectMap({
   );
 
   const applyParcel = React.useCallback(
-    (map: maplibregl.Map, ring: Ring) => {
+    (map: maplibregl.Map, ring: Ring, orientRad?: number) => {
       ringRef.current = ring;
-      const m = buildMassing(ring, floors, coverageRatio, units);
+      if (orientRad != null) orientRef.current = orientRad;
+      const m = buildMassing(ring, floors, coverageRatio, units, orientRef.current);
       const pal = palette(dark);
       const set = (id: string, data: GeoJSON.GeoJSON) => {
         const src = map.getSource(id) as maplibregl.GeoJSONSource | undefined;
@@ -1013,7 +1108,10 @@ export function ProjectMap({
       applyFog(map, dark);
       applySky(map, dark);
       addContextBuildings(map, dark);
-      applyParcel(map, initialRing);
+      // synthetic lots start at a base off-axis angle; once tiles load we re-align
+      // them to the real street grid below. Real parcels (gush/helka) keep PCA.
+      const synthetic = !(gush && helka) && !(parcelRing && parcelRing.length >= 4);
+      applyParcel(map, initialRing, synthetic ? 0.2 : undefined);
 
       for (const c of comparables) {
         if (c.lat == null || c.lng == null) continue;
@@ -1029,21 +1127,26 @@ export function ProjectMap({
       // cinematic reveal: fly into a padded, pitched, lot-oriented frame (2.2s)
       frameToParcel(map, ringRef.current ?? initialRing, true, 2200, frameH);
 
-      // Once tiles are ready: (1) nudge a synthetic lot off existing buildings, then
-      // (2) demolish the existing buildings that sit on the (final) lot.
-      const synthetic = !(gush && helka) && !(parcelRing && parcelRing.length >= 4);
+      // Once tiles are ready: (1) ROTATE the synthetic lot to the local street grid,
+      // (2) TRANSLATE it off existing buildings, then (3) demolish the buildings that
+      // sit on the final lot. Rotate-then-shift makes the cluster sit ALONG the block.
       map.once("idle", () => {
         if (!mapRef.current || !ringRef.current) return;
         if (synthetic && USE_MAPBOX) {
           const c = centroid(ringRef.current);
+          // (1) align to the street grid (fall back to the base angle if no roads)
+          const grid = dominantGridAngle(map, c);
+          const theta = grid ?? 0.2;
+          let ring = synthRing(c[1], c[0], areaSqm, theta);
+          // (2) shift to a clear spot (avoid major roads / existing buildings)
           const clear = findClearCentroid(map, c, 40);
           const dLng = clear[0] - c[0];
           const dLat = clear[1] - c[1];
           if (Math.abs(dLng) > 1e-7 || Math.abs(dLat) > 1e-7) {
-            const shifted = ringRef.current.map(([x, y]) => [x + dLng, y + dLat]) as Ring;
-            applyParcel(map, shifted);
-            frameToParcel(map, shifted, true, 700, frameH);
+            ring = ring.map(([x, y]) => [x + dLng, y + dLat]) as Ring;
           }
+          applyParcel(map, ring, theta);
+          frameToParcel(map, ring, true, 700, frameH, theta);
         }
         // demolish on the next idle (after any shift / camera move settles)
         map.once("idle", () => clearPlot(map));
@@ -1055,6 +1158,7 @@ export function ProjectMap({
           .then((d) => {
             const ring = d?.parcel?.ring as Ring | undefined;
             if (ring && ring.length >= 3 && mapRef.current) {
+              orientRef.current = undefined; // real cadastral lot → orient by its own PCA
               applyParcel(mapRef.current, ring);
               frameToParcel(mapRef.current, ring, true, 1200, frameH); // re-frame to the real parcel
               setParcelLive(true);

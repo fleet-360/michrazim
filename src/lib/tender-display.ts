@@ -1,4 +1,17 @@
-import type { TenderCategory } from "@/lib/data/rmi";
+import type { TenderCategory, RmiTender } from "@/lib/data/rmi";
+
+/** True when the tender itself states a dwelling-unit count (vs. our fallback). */
+export function tenderHasUnits(t: RmiTender): boolean {
+  return (t.targetUnits ?? 0) > 0 || (t.units ?? 0) > 0;
+}
+
+/** The unit total the massing is drawn from — single source for the 3D AND the
+ *  on-screen rationale, so the two can never disagree. Lives in this neutral
+ *  (non-"use client") module so both the client preview and the server-rendered
+ *  tender page can call it across the client boundary. */
+export function massingUnits(t: RmiTender): number {
+  return Math.max(8, t.targetUnits || t.units || 40);
+}
 
 /** Consistent label / badge / map-marker color per tender category. */
 export const CATEGORY_META: Record<

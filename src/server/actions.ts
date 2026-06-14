@@ -2,26 +2,84 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
 import { connectDB } from "./db";
-import { AiInsight, Project, Comparable, City } from "./models";
+import { AiInsight, Project, Comparable, City, User } from "./models";
 import { getProjectById, getCities } from "./queries";
 import { verifyCredentials, createSession, destroySession, getSession } from "./auth";
 import { analyzeProject } from "./analysis";
 import { riskAnalysis, answerQuestion, decisionReport, parseTenderText, methodologyAssistant, parseDealsText, type ProjectMeta } from "@/lib/ai/insights";
+import { derivePlotForUnits } from "@/lib/import-derive";
 import type { DealInputs, Track } from "@/lib/engine/types";
+
+/** Only allow same-origin relative redirects (guard against open-redirect). */
+function safeNext(next: string): string {
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+}
 
 export async function loginAction(_prev: unknown, formData: FormData) {
   const email = String(formData.get("email") || "");
   const password = String(formData.get("password") || "");
+  const next = String(formData.get("next") || "");
   const user = await verifyCredentials(email, password);
   if (!user) return { error: "אימייל או סיסמה שגויים" };
   await createSession(user);
-  redirect("/dashboard");
+  redirect(safeNext(next));
+}
+
+/** Self-service registration (email + password) with onboarding profile fields. */
+export async function registerAction(_prev: unknown, formData: FormData) {
+  const email = String(formData.get("email") || "").toLowerCase().trim();
+  const password = String(formData.get("password") || "");
+  const name = String(formData.get("name") || "").trim();
+  const company = String(formData.get("company") || "").trim();
+  const title = String(formData.get("title") || "").trim();
+  const next = String(formData.get("next") || "");
+  if (!email || !password || !name) return { error: "נא למלא אימייל, שם וסיסמה" };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "כתובת אימייל לא תקינה" };
+  if (password.length < 6) return { error: "הסיסמה חייבת להכיל לפחות 6 תווים" };
+  try {
+    await connectDB();
+    const existing = await User.findOne({ email }).lean();
+    if (existing) return { error: "כתובת האימייל כבר רשומה — נסו להתחבר" };
+    const passwordHash = await bcrypt.hash(password, 10);
+    const created = await User.create({ email, name, passwordHash, role: "analyst", company, title, onboarded: true });
+    await createSession({ id: created._id.toString(), email, name, title: title || undefined, role: "analyst" });
+  } catch (e) {
+    console.error("registerAction failed:", e);
+    return { error: "ההרשמה נכשלה — נסו שוב." };
+  }
+  redirect(safeNext(next));
 }
 
 export async function logoutAction() {
   await destroySession();
   redirect("/login");
+}
+
+/** Add/remove a tender from the signed-in user's watchlist (favorites). */
+export async function toggleWatchAction(
+  tenderId: string,
+): Promise<{ watching: boolean } | { requireAuth: true }> {
+  const session = await getSession();
+  if (!session) return { requireAuth: true };
+  await connectDB();
+  const user = await User.findById(session.id).select("watchlist");
+  if (!user) return { requireAuth: true };
+  const list: string[] = Array.isArray(user.watchlist) ? user.watchlist : [];
+  const idx = list.indexOf(tenderId);
+  let watching: boolean;
+  if (idx >= 0) {
+    list.splice(idx, 1);
+    watching = false;
+  } else {
+    list.push(tenderId);
+    watching = true;
+  }
+  user.set("watchlist", list);
+  await user.save();
+  revalidatePath("/dashboard");
+  return { watching };
 }
 
 async function loadMetaAndAnalysis(id: string, opts?: { bid?: number; riskAppetite?: number }) {
@@ -92,6 +150,7 @@ export async function parseTenderAction(text: string) {
 }
 
 export async function importDealsAction(text: string, city: string) {
+  if (!(await getSession())) return { requireAuth: true as const };
   if (!text.trim() || !city) return { error: "נא לבחור עיר ולהדביק נתונים" };
   const deals = await parseDealsText(text, city);
   if (!deals || deals.length === 0) return { error: "לא הצלחתי לזהות עסקאות בטקסט" };
@@ -191,6 +250,7 @@ export interface NewProjectInput {
 
 export async function createProjectAction(data: NewProjectInput) {
   const session = await getSession();
+  if (!session) return { requireAuth: true as const };
   await connectDB();
   const created = await Project.create({
     name: data.name,
@@ -229,38 +289,43 @@ export interface ImportTenderInput {
   totalDevelopCost?: number;
 }
 
-/** Create a fully-analyzable project from a live RMI tender (real dev costs). */
-export async function importTenderAction(t: ImportTenderInput) {
-  const session = await getSession();
+export type ImportResult = { error?: string; requireAuth?: boolean } | void;
+
+interface CreateImportedOpts {
+  name: string;
+  city: string;
+  track: "RMI" | "URBAN_RENEWAL";
+  units: number;
+  far: number;
+  developCost?: number;
+  existingUnits?: number;
+}
+
+/** Shared project-creation for both import flows. Throws on DB failure. */
+async function createImportedProject(opts: CreateImportedOpts): Promise<string> {
   await connectDB();
+  const session = await getSession();
   const cities = await getCities();
-  const cityRow = cities.find((c) => c.name === t.city);
+  const cityRow = cities.find((c) => c.name === opts.city);
   const avgPrice = cityRow?.avgResidentialPricePerSqm ?? 26000;
-
-  const units = Math.max(8, t.units || 60);
-  // Reverse-engineer a plot area that makes the rights engine reproduce the tender's
-  // stated unit count exactly, so the project card matches the source tender (no 255→242
-  // surprise). Mirrors buildInputsFromTemplate (RMI): far 3.0, eff 0.82, avg unit 92 m²,
-  // commercial 12% of plot ⇒ engine units = floor((plot·far·eff − round(plot·0.12)) / 92).
-  const FAR = 3.0;
-  const unitsFor = (plot: number) => Math.floor((plot * FAR * 0.82 - Math.round(plot * 0.12)) / 92);
-  let plotAreaSqm = Math.round((units * 92) / (FAR * 0.82 - 0.12)); // invert the net factor (2.34)
-  // integer-rounding correction so the derived unit count lands exactly on the tender's
-  for (let i = 0; i < 80 && unitsFor(plotAreaSqm) !== units; i++) {
-    plotAreaSqm += unitsFor(plotAreaSqm) < units ? 1 : -1;
-  }
-
-  const inputs = buildInputsFromTemplate({ track: "RMI", city: t.city, plotAreaSqm, far: FAR, avgPricePerSqm: avgPrice });
-  // totalDevelopCost is the RMI project-total development pay (TenderDevPay).
-  if (t.totalDevelopCost && t.totalDevelopCost > 0) inputs.developmentCostsRMI = t.totalDevelopCost;
-
-  const geo = geocodeCity(t.city);
+  const units = Math.max(8, opts.units || 60);
+  const plotAreaSqm = derivePlotForUnits(units, opts.far);
+  const inputs = buildInputsFromTemplate({
+    track: opts.track,
+    city: opts.city,
+    plotAreaSqm,
+    far: opts.far,
+    avgPricePerSqm: avgPrice,
+    existingUnits: opts.existingUnits && opts.existingUnits > 0 ? opts.existingUnits : undefined,
+  });
+  if (opts.developCost && opts.developCost > 0) inputs.developmentCostsRMI = opts.developCost;
+  const geo = geocodeCity(opts.city);
   const created = await Project.create({
-    name: t.name,
-    track: "RMI",
+    name: opts.name,
+    track: opts.track,
     status: "ANALYZING",
-    city: t.city,
-    address: t.city,
+    city: opts.city,
+    address: opts.city,
     lat: geo?.lat,
     lng: geo?.lng,
     plotAreaSqm,
@@ -268,6 +333,59 @@ export async function importTenderAction(t: ImportTenderInput) {
     inputs,
     createdBy: session ? session.id : undefined,
   });
+  return created._id.toString();
+}
+
+/**
+ * Create a fully-analyzable project from a live RMI tender (real dev costs).
+ * redirect() is OUTSIDE the try so its control-flow signal is never mistaken for
+ * a failure; only a genuine DB error returns { error } (shown to the user).
+ */
+export async function importTenderAction(t: ImportTenderInput): Promise<ImportResult> {
+  if (!(await getSession())) return { requireAuth: true };
+  let id = "";
+  try {
+    id = await createImportedProject({
+      name: t.name,
+      city: t.city,
+      track: "RMI",
+      units: t.units,
+      far: 3.0,
+      developCost: t.totalDevelopCost,
+    });
+  } catch (e) {
+    console.error("importTenderAction failed:", e);
+    return { error: "שמירת המכרז נכשלה — בדקו את החיבור למסד הנתונים ונסו שוב." };
+  }
   revalidatePath("/dashboard");
-  redirect(`/projects/${created._id.toString()}`);
+  redirect(`/projects/${id}`);
+}
+
+export interface ImportRenewalInput {
+  name: string;
+  city: string;
+  targetUnits: number;
+  existingUnits?: number;
+  planNumber?: string;
+}
+
+/** Create an URBAN_RENEWAL project from a live urban-renewal compound (פינוי-בינוי/תמ"א). */
+export async function importRenewalAction(t: ImportRenewalInput): Promise<ImportResult> {
+  if (!(await getSession())) return { requireAuth: true };
+  let id = "";
+  try {
+    id = await createImportedProject({
+      name: t.name,
+      city: t.city,
+      track: "URBAN_RENEWAL",
+      units: t.targetUnits,
+      far: 4.5,
+      existingUnits: t.existingUnits,
+    });
+  } catch (e) {
+    console.error("importRenewalAction failed:", e);
+    return { error: "שמירת המתחם נכשלה — בדקו את החיבור למסד הנתונים ונסו שוב." };
+  }
+  revalidatePath("/dashboard");
+  redirect(`/projects/${id}`);
 }

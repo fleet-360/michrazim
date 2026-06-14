@@ -87,7 +87,7 @@ export function NewProjectWizard({ cities }: { cities: CityOpt[] }) {
       return;
     }
     setSubmitting(true);
-    await createProjectAction({
+    const res = await createProjectAction({
       name,
       track,
       city: cityName,
@@ -99,6 +99,11 @@ export function NewProjectWizard({ cities }: { cities: CityOpt[] }) {
       marketAnchor: preview ? Math.round(preview.recommendation.recommendedBid) : undefined,
       inputs,
     });
+    if (res && "requireAuth" in res && res.requireAuth) {
+      toast("התחברו כדי לשמור את הפרויקט");
+      window.location.href = `/login?mode=register&next=${encodeURIComponent("/projects/new")}`;
+      return;
+    }
   }
 
   const steps = ["מסלול", "מיקום", "פרמטרים", "סיכום"];

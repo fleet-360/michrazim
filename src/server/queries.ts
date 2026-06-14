@@ -1,7 +1,17 @@
 import "server-only";
 import { connectDB } from "./db";
-import { City, Comparable, Project, TenderListing } from "./models";
+import { City, Comparable, Project, TenderListing, User } from "./models";
+import { getSession } from "./auth";
 import type { DealInputs, Track } from "@/lib/engine/types";
+
+/** Tender ids (dc-/pl-/ur-) the signed-in user follows. Empty for anonymous. */
+export async function getWatchlist(): Promise<string[]> {
+  const session = await getSession();
+  if (!session) return [];
+  await connectDB();
+  const user = await User.findById(session.id).select("watchlist").lean<{ watchlist?: string[] }>();
+  return user?.watchlist ?? [];
+}
 
 /** JSON-safe plain object (ObjectId → hex string, Date → ISO). */
 function plain<T>(doc: unknown): T {
@@ -89,17 +99,25 @@ export async function getCities(): Promise<CityRow[]> {
   return plain<CityRow[]>(docs);
 }
 
+/** Projects belonging to the signed-in user. Anonymous users get an empty list. */
 export async function getProjects(): Promise<ProjectRow[]> {
+  const session = await getSession();
+  if (!session) return [];
   await connectDB();
-  const docs = await Project.find().sort({ updatedAt: -1 }).lean();
+  const docs = await Project.find({ createdBy: session.id }).sort({ updatedAt: -1 }).lean();
   return plain<ProjectRow[]>(docs);
 }
 
+/** A single project, only if it belongs to the signed-in user (owner-scoped). */
 export async function getProjectById(id: string): Promise<ProjectRow | null> {
-  await connectDB();
   if (!/^[a-f\d]{24}$/i.test(id)) return null;
-  const doc = await Project.findById(id).lean();
-  return doc ? plain<ProjectRow>(doc) : null;
+  await connectDB();
+  const doc = await Project.findById(id).lean<{ createdBy?: { toString(): string } }>();
+  if (!doc) return null;
+  const session = await getSession();
+  // owner-scoped: a project with an owner is visible only to that owner
+  if (doc.createdBy && (!session || String(doc.createdBy) !== session.id)) return null;
+  return plain<ProjectRow>(doc);
 }
 
 export async function getComparables(city?: string): Promise<ComparableRow[]> {

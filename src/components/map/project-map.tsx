@@ -43,6 +43,10 @@ export interface ProjectMapProps {
    *  visual footprint from the same number keeps the massing and floor math
    *  consistent — footprint area = coverageRatio · parcelArea. */
   coverageRatio?: number;
+  /** Illustrative volume study (no real parcel): lays a clean neutral ground pad
+   *  under the massing so it reads as a deliberate study, not a building dropped
+   *  on a street. Used for tenders that carry no cadastral coordinates. */
+  illustrative?: boolean;
   comparables?: Comparable[];
   className?: string;
   interactive?: boolean;
@@ -76,6 +80,7 @@ function palette(dark: boolean) {
     balcony: dark ? "#8294b8" : "#a9b8d6", // mid-height amenity band
     parcelFill: dark ? "#5b6b8c" : "#8aa0c4", // tinted to the tower hue
     parcelLine: dark ? "#9fb0d0" : "#5d6f96", // dashed survey line
+    groundPad: dark ? "#0c111c" : "#e9edf4", // neutral plot under an illustrative study
   };
 }
 
@@ -573,6 +578,68 @@ function frameToParcel(map: maplibregl.Map, ring: Ring, animate: boolean, durati
   } as maplibregl.FitBoundsOptions);
 }
 
+/**
+ * Smart placement: for an illustrative massing (no real cadastral location), find
+ * a nearby spot whose footprint does NOT sit on top of existing buildings, so the
+ * study reads as dropped into an open area / within the street block rather than
+ * clipping through real buildings. Uses the live map's building features (fast,
+ * deterministic) — preferred over a per-render LLM screenshot check for speed and
+ * reliability. Returns a possibly-shifted centroid (lng/lat).
+ */
+function findClearCentroid(map: maplibregl.Map, center: [number, number], stepM: number): [number, number] {
+  if (!USE_MAPBOX) return center;
+  try {
+    const style = (map as unknown as { getStyle?: () => { layers?: { id: string; type?: string; "source-layer"?: string }[] } }).getStyle?.();
+    const buildingLayers = (style?.layers ?? [])
+      .filter((l) => l["source-layer"] === "building" && (l.type === "fill-extrusion" || l.type === "fill"))
+      .map((l) => l.id);
+    if (!buildingLayers.length) return center;
+
+    const score = (c: [number, number]): number => {
+      const px = map.project(c as unknown as maplibregl.LngLatLike);
+      const samples: [number, number][] = [
+        [0, 0],
+        [16, 0],
+        [-16, 0],
+        [0, 16],
+        [0, -16],
+      ];
+      let hits = 0;
+      for (const [dx, dy] of samples) {
+        const f = map.queryRenderedFeatures([px.x + dx, px.y + dy] as unknown as maplibregl.PointLike, {
+          layers: buildingLayers,
+        });
+        if (f.length) hits++;
+      }
+      return hits;
+    };
+
+    if (score(center) === 0) return center; // already clear
+    const dLngM = 1 / (111320 * Math.cos((center[1] * Math.PI) / 180));
+    const dLatM = 1 / 111320;
+    let best = center;
+    let bestScore = score(center);
+    for (let r = 1; r <= 3; r++) {
+      for (let a = 0; a < 8; a++) {
+        const ang = (a / 8) * 2 * Math.PI;
+        const cand: [number, number] = [
+          center[0] + Math.cos(ang) * stepM * r * dLngM,
+          center[1] + Math.sin(ang) * stepM * r * dLatM,
+        ];
+        const s = score(cand);
+        if (s < bestScore) {
+          bestScore = s;
+          best = cand;
+          if (s === 0) return best;
+        }
+      }
+    }
+    return best;
+  } catch {
+    return center;
+  }
+}
+
 export function ProjectMap({
   lat,
   lng,
@@ -582,6 +649,7 @@ export function ProjectMap({
   helka,
   floors = 12,
   coverageRatio = COVERAGE,
+  illustrative = false,
   comparables = [],
   className,
   interactive = true,
@@ -618,7 +686,20 @@ export function ProjectMap({
         features: [poly(shadowHalo, { soft: 1 }), poly(shadowCore, { soft: 0 })],
       };
 
+      // illustrative volume study: a clean neutral plot under the massing that masks
+      // the basemap streets, so the building reads as a study rather than dropped on a road.
+      const groundPad = insetRing(ring, -1.7); // expand the lot outward ~2.7×
+
       if (!map.getSource("parcel")) {
+        if (illustrative) {
+          map.addSource("ground-pad", { type: "geojson", data: poly(groundPad) });
+          map.addLayer({
+            id: "ground-pad",
+            type: "fill",
+            source: "ground-pad",
+            paint: { "fill-color": pal.groundPad, "fill-opacity": dark ? 0.9 : 0.94 },
+          });
+        }
         // parcel fill (tinted to the tower hue) + soft glow underlay + dashed line
         map.addSource("parcel", { type: "geojson", data: m.parcel });
         map.addLayer({
@@ -787,6 +868,7 @@ export function ProjectMap({
           },
         });
       } else {
+        if (illustrative) set("ground-pad", poly(groundPad));
         set("parcel", m.parcel);
         set("ground-shadow", shadowData);
         set("podium", m.podium);
@@ -799,7 +881,7 @@ export function ProjectMap({
         map.setPaintProperty("tower-3d", "fill-extrusion-color", m.towerColor);
       }
     },
-    [floors, coverageRatio, dark],
+    [floors, coverageRatio, dark, illustrative],
   );
 
   React.useEffect(() => {
@@ -865,6 +947,24 @@ export function ProjectMap({
 
       // cinematic reveal: fly into a padded, pitched, lot-oriented frame (2.2s)
       frameToParcel(map, ringRef.current ?? initialRing, true, 2200);
+
+      // Smart placement: when the location is synthetic (no real gush/helka), nudge
+      // the illustrative massing off existing buildings once tiles are ready.
+      const synthetic = !(gush && helka) && !(parcelRing && parcelRing.length >= 4);
+      if (synthetic && USE_MAPBOX) {
+        map.once("idle", () => {
+          if (!mapRef.current || !ringRef.current) return;
+          const c = centroid(ringRef.current);
+          const clear = findClearCentroid(map, c, 35);
+          const dLng = clear[0] - c[0];
+          const dLat = clear[1] - c[1];
+          if (Math.abs(dLng) > 1e-7 || Math.abs(dLat) > 1e-7) {
+            const shifted = ringRef.current.map(([x, y]) => [x + dLng, y + dLat]) as Ring;
+            applyParcel(map, shifted);
+            frameToParcel(map, shifted, true, 700);
+          }
+        });
+      }
 
       if (gush && helka) {
         fetch(`/api/parcel?gush=${encodeURIComponent(gush)}&helka=${encodeURIComponent(helka)}`)

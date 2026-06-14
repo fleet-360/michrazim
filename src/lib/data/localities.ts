@@ -77,6 +77,8 @@ export const LOCALITIES: Record<string, [number, number]> = {
   "טייבה": [32.2660, 35.0100],
 };
 
+import { CBS_BY_CODE, CBS_BY_NAME } from "./cbs-localities";
+
 function normalizeName(name: string): string {
   return name
     .replace(/["׳״']/g, "")
@@ -85,21 +87,34 @@ function normalizeName(name: string): string {
     .trim();
 }
 
+/** Tight normalization matching scripts/gen-localities.ts (strips quotes/hyphens/all spaces). */
+const normTight = (s: string) => s.replace(/["'`׳״\-\s]/g, "");
+
 const NORMALIZED: Record<string, [number, number]> = Object.fromEntries(
   Object.entries(LOCALITIES).map(([k, v]) => [normalizeName(k), v]),
 );
 
-export function geocodeCity(city: string): { lat: number; lng: number } | null {
+/**
+ * Geocode an Israeli locality to WGS84. Prefers the exact CBS settlement CODE
+ * (covers ~all settlements, no name ambiguity), then a curated centroid for major
+ * cities, then the CBS name index, then a loose contains match. Returns null if
+ * nothing matches (the caller then omits the marker / shows "no map").
+ */
+export function geocodeCity(
+  city: string,
+  code?: string | number,
+): { lat: number; lng: number } | null {
+  if (code != null && String(code).trim()) {
+    const byCode = CBS_BY_CODE[String(code).trim()];
+    if (byCode) return { lat: byCode[0], lng: byCode[1] };
+  }
   if (!city) return null;
   const key = normalizeName(city);
-  let hit = NORMALIZED[key];
+  let hit = NORMALIZED[key] || CBS_BY_NAME[normTight(city)];
   if (!hit) {
-    // try a loose contains match
     const found = Object.keys(NORMALIZED).find((k) => k.includes(key) || key.includes(k));
     if (found) hit = NORMALIZED[found];
   }
   if (!hit) return null;
-  // small deterministic jitter so co-located tenders don't overlap exactly
-  const j = (city.length % 7) / 6000;
-  return { lat: hit[0] + j, lng: hit[1] + j };
+  return { lat: hit[0], lng: hit[1] };
 }

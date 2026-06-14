@@ -1,21 +1,27 @@
 import { Database } from "lucide-react";
-import { getLiveTenders, getRmiTotals } from "@/lib/data/rmi";
+import { getLiveTenders, getRmiTotals, toListItem } from "@/lib/data/rmi";
+import { getWatchlist } from "@/server/queries";
 import { TendersExplorer } from "@/components/tenders/tenders-explorer";
 import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 
 export default async function TendersPage() {
-  const [tenders, totals] = await Promise.all([getLiveTenders({ limit: 400 }), getRmiTotals()]);
-  const live = tenders.some((t) => t.source === "live");
+  const [all, totals, watched] = await Promise.all([
+    getLiveTenders({ limit: 2000 }),
+    getRmiTotals(),
+    getWatchlist(),
+  ]);
+  const live = all.some((t) => t.source === "live");
+  const tenders = all.map(toListItem);
 
   return (
     <div className="space-y-5">
       <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
         <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">מכרזי רמ״י ותכניות</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">מכרזים, תכנון והתחדשות עירונית</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            פרויקטים ותכניות מגורים אמיתיים מרשות מקרקעי ישראל — לחצו “ייבא לניתוח” כדי לחתם כל אחד
+            מכרזי רמ״י, מלאי תכנוני (תב״ע) ומתחמי התחדשות עירונית אמיתיים — לחצו על כל כרטיס לפרטים מלאים ולחיתום
           </p>
         </div>
         <Badge variant={live ? "success" : "secondary"} className="h-7 gap-1.5">
@@ -25,7 +31,7 @@ export default async function TendersPage() {
         </Badge>
       </div>
 
-      <TendersExplorer tenders={tenders} live={live} totalAvailable={totals.total} />
+      <TendersExplorer tenders={tenders} live={live} totals={totals} watched={watched} />
     </div>
   );
 }

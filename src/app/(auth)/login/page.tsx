@@ -1,12 +1,18 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/server/auth";
-import { LoginForm } from "@/components/auth/login-form";
+import { AuthForm } from "@/components/auth/auth-form";
 import { Logo, LogoMark } from "@/components/brand/logo";
 import { IconMarket, IconRisk, IconParcel, IconAI } from "@/components/brand/icons";
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string; next?: string }>;
+}) {
+  const { mode, next } = await searchParams;
+  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
   const session = await getSession();
-  if (session) redirect("/dashboard");
+  if (session) redirect(safeNext);
 
   const features = [
     { icon: IconMarket, title: "שווי קרקע שיורי", desc: "מנוע חיתום שמחשב כמה הקרקע באמת שווה לך" },
@@ -65,11 +71,11 @@ export default async function LoginPage() {
           <div className="mb-8 lg:hidden">
             <Logo />
           </div>
-          <h2 className="font-display text-2xl font-bold">כניסה לחשבון</h2>
+          <h2 className="font-display text-2xl font-bold">כניסה / הרשמה</h2>
           <p className="mb-7 mt-1 text-sm text-muted-foreground">
-            התחברו כדי לנהל את הפרויקטים שלכם
+            צפייה וניתוח פתוחים לכולם — חשבון נדרש רק כדי לשמור פרויקטים ומועדפים
           </p>
-          <LoginForm />
+          <AuthForm mode={mode === "register" ? "register" : "login"} next={next} />
         </div>
       </div>
     </div>

@@ -324,7 +324,7 @@ export function ProjectWorkspace(props: WorkspaceProps) {
       <Tabs defaultValue="map">
         <div className="overflow-x-auto">
           <TabsList>
-            <TabsTrigger value="map"><Boxes className="ms-1" />מפה ו-3D</TabsTrigger>
+            <TabsTrigger value="map"><Boxes className="ms-1" />מפה ותלת-ממד</TabsTrigger>
             <TabsTrigger value="overview"><LayoutDashboard className="ms-1" />סקירה</TabsTrigger>
             <TabsTrigger value="rights"><Layers className="ms-1" />זכויות</TabsTrigger>
             <TabsTrigger value="costs"><Coins className="ms-1" />עלויות</TabsTrigger>

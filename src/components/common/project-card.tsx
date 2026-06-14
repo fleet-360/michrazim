@@ -29,7 +29,7 @@ export function ProjectCard({ p }: { p: ProjectCardData }) {
   const riskHigh = p.probabilityOfLoss > 0.15;
   return (
     <Link href={`/projects/${p.id}`} className="group block">
-      <Card className="relative h-full overflow-hidden p-0 transition-all hover:border-primary/40 hover:shadow-lg">
+      <Card className="relative h-full overflow-hidden p-0 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg">
         <div className="h-1.5 w-full" style={{ background: track.color }} />
         <div className="p-5">
           <div className="flex items-start justify-between gap-2">

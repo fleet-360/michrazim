@@ -20,6 +20,10 @@ const UserSchema = new Schema(
     role: { type: String, enum: ["admin", "analyst", "viewer"], default: "analyst" },
     orgId: { type: Schema.Types.ObjectId, ref: "Organization" },
     title: String,
+    company: String,
+    // tender ids (dc-/pl-/ur-) the user follows
+    watchlist: { type: [String], default: [] },
+    onboarded: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

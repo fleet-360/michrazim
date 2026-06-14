@@ -214,6 +214,19 @@ h1, h2, h3 {
   opacity: 0.6;
 }
 
+/* Let the themed inner div fully control the marker popup (fixes white-on-white). */
+.radius-popup .maplibregl-popup-content,
+.radius-popup .mapboxgl-popup-content {
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  border-radius: 0;
+}
+.radius-popup .maplibregl-popup-tip,
+.radius-popup .mapboxgl-popup-tip {
+  display: none;
+}
+
 @keyframes shimmer {
   100% {
     transform: translateX(100%);

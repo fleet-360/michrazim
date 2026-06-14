@@ -27,6 +27,14 @@ const NAV = [
   { href: "/integrations", label: "אינטגרציות", icon: IconIntegrations },
 ];
 
+// compact set for the mobile bottom bar
+const MOBILE_NAV = [
+  { href: "/dashboard", label: "בקרה", icon: IconDashboard },
+  { href: "/tenders", label: "מכרזים", icon: IconTender },
+  { href: "/map", label: "מפה", icon: IconMap },
+  { href: "/comparables", label: "שוק", icon: IconMarket },
+];
+
 interface ProjectLite {
   _id: string;
   name: string;
@@ -39,7 +47,7 @@ export function AppShell({
   projects = [],
   children,
 }: {
-  user: SessionUser;
+  user: SessionUser | null;
   projects?: ProjectLite[];
   children: React.ReactNode;
 }) {
@@ -56,7 +64,7 @@ export function AppShell({
           </Link>
 
           <Button asChild className="mt-7 gap-2" size="lg">
-            <Link href="/projects/new">
+            <Link href={user ? "/projects/new" : "/login?mode=register&next=%2Fprojects%2Fnew"}>
               <IconNew className="size-[18px]" />
               עסקה חדשה
             </Link>
@@ -84,20 +92,34 @@ export function AppShell({
           </nav>
 
           <div className="mt-auto rounded-[var(--radius-lg)] border border-border bg-card/60 p-3">
-            <div className="flex items-center gap-3">
-              <div className="grid size-9 place-items-center rounded-full bg-primary/15 font-semibold text-primary">
-                {user.name?.[0] ?? "מ"}
+            {user ? (
+              <div className="flex items-center gap-3">
+                <div className="grid size-9 place-items-center rounded-full bg-primary/15 font-semibold text-primary">
+                  {user.name?.[0] ?? "מ"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">{user.name}</div>
+                  <div className="truncate text-xs text-muted-foreground">{user.title ?? user.email}</div>
+                </div>
+                <form action={logoutAction}>
+                  <Button variant="ghost" size="icon" aria-label="התנתק" type="submit">
+                    <LogOut className="size-4" />
+                  </Button>
+                </form>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{user.name}</div>
-                <div className="truncate text-xs text-muted-foreground">{user.title ?? user.email}</div>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-xs text-muted-foreground">צפייה וניתוח פתוחים לכולם. התחברו כדי לשמור.</div>
+                <div className="flex gap-2">
+                  <Button asChild size="sm" className="flex-1">
+                    <Link href={`/login?mode=register${pathname ? `&next=${encodeURIComponent(pathname)}` : ""}`}>הרשמה</Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline" className="flex-1">
+                    <Link href={`/login${pathname ? `?next=${encodeURIComponent(pathname)}` : ""}`}>כניסה</Link>
+                  </Button>
+                </div>
               </div>
-              <form action={logoutAction}>
-                <Button variant="ghost" size="icon" aria-label="התנתק" type="submit">
-                  <LogOut className="size-4" />
-                </Button>
-              </form>
-            </div>
+            )}
           </div>
         </aside>
 
@@ -120,18 +142,45 @@ export function AppShell({
                 <Search className="size-4" />
               </Button>
               <ThemeToggle />
-              <Button asChild variant="outline" size="sm" className="gap-2 lg:hidden">
-                <Link href="/projects/new">
-                  <Plus className="size-4" />
-                  חדש
-                </Link>
-              </Button>
+              {user ? (
+                <Button asChild variant="outline" size="sm" className="gap-2 lg:hidden">
+                  <Link href="/projects/new">
+                    <Plus className="size-4" />
+                    חדש
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild size="sm" className="gap-1.5 lg:hidden">
+                  <Link href={`/login${pathname ? `?next=${encodeURIComponent(pathname)}` : ""}`}>כניסה</Link>
+                </Button>
+              )}
             </div>
           </header>
 
-          <main className="flex-1 px-5 pb-28 pt-6">{children}</main>
+          <main className="flex-1 px-4 pb-28 pt-6 sm:px-5">{children}</main>
         </div>
       </div>
+
+      {/* mobile bottom navigation */}
+      <nav className="no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-border bg-background/92 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl lg:hidden">
+        {MOBILE_NAV.map((item) => {
+          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex flex-1 flex-col items-center gap-0.5 rounded-[var(--radius-md)] py-1 text-[10px] font-medium transition-colors",
+                active ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              <item.icon className="size-[22px]" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
       <CommandPalette projects={projects} />
       <AssistantWidget />
     </div>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowUpLeft } from "lucide-react";
 import { IconWallet, IconStack, IconRisk, IconDoc, IconCalendar } from "@/components/brand/icons";
 import { getProjects, getCities } from "@/server/queries";
-import { getLiveTenders, getRmiTotals } from "@/lib/data/rmi";
+import { getLiveTenders, getRmiTotals, parseHebDate } from "@/lib/data/rmi";
 import { getDataSourceStatus } from "@/server/status";
 import { analyzeProject } from "@/server/analysis";
 import { computeDealScore } from "@/lib/verdict";
@@ -21,11 +21,16 @@ export default async function DashboardPage() {
   const [projects, cities, tenders, rmiTotals, status] = await Promise.all([
     getProjects(),
     getCities(),
-    getLiveTenders({ limit: 12 }),
+    getLiveTenders({ limit: 2000 }),
     getRmiTotals(),
     getDataSourceStatus(),
   ]);
   const tendersLive = tenders.some((t) => t.source === "live");
+  // "אחרונים" = most-recent RMI tenders by their published index date
+  const recentTenders = tenders
+    .filter((t) => t.category === "tender")
+    .sort((a, b) => parseHebDate(b.tenderDate) - parseHebDate(a.tenderDate))
+    .slice(0, 8);
 
   const cards: ProjectCardData[] = projects.map((p) => {
     const a = analyzeProject(
@@ -142,17 +147,23 @@ export default async function DashboardPage() {
                   <th className="px-3 py-2.5 font-medium">מחוז</th>
                   <th className="px-3 py-2.5 font-medium">יח״ד</th>
                   <th className="px-3 py-2.5 font-medium">עלות פיתוח</th>
+                  <th className="px-3 py-2.5 font-medium">תאריך</th>
                   <th className="px-5 py-2.5 font-medium">סטטוס</th>
                 </tr>
               </thead>
               <tbody>
-                {tenders.slice(0, 8).map((t) => (
-                  <tr key={t.id} className="border-b border-border/60 transition-colors hover:bg-secondary/40">
-                    <td className="max-w-xs truncate px-5 py-3 font-medium">{t.name}</td>
+                {recentTenders.map((t) => (
+                  <tr key={t.id} className="relative border-b border-border/60 transition-colors hover:bg-secondary/40">
+                    <td className="max-w-xs truncate px-5 py-3 font-medium">
+                      <Link href={`/tenders/${encodeURIComponent(t.id)}`} className="text-foreground after:absolute after:inset-0 hover:text-primary">
+                        {t.name}
+                      </Link>
+                    </td>
                     <td className="px-3 py-3 text-muted-foreground">{t.city}</td>
                     <td className="px-3 py-3 text-muted-foreground">{t.district || "—"}</td>
                     <td className="px-3 py-3 tabular-nums">{t.units || "—"}</td>
                     <td className="px-3 py-3 tabular-nums">{t.totalDevelopCost ? formatShekelShort(t.totalDevelopCost) : "—"}</td>
+                    <td className="px-3 py-3 tabular-nums text-muted-foreground">{t.tenderDate || "—"}</td>
                     <td className="px-5 py-3">
                       <Badge variant={t.status.includes("מכרז") ? "success" : "secondary"}>{t.status}</Badge>
                     </td>

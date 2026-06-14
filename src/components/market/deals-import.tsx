@@ -29,6 +29,11 @@ export function DealsImport({ cities }: { cities: { _id: string; name: string }[
     setLoading(true);
     const res = await importDealsAction(text, city);
     setLoading(false);
+    if ("requireAuth" in res && res.requireAuth) {
+      toast("התחברו כדי לייבא ולשמור עסקאות");
+      window.location.href = `/login?mode=register&next=${encodeURIComponent("/comparables")}`;
+      return;
+    }
     if ("error" in res) return toast.error(res.error);
     toast.success(`יובאו ${res.count} עסקאות אמיתיות ל${city}`);
     setText("");

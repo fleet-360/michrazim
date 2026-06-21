@@ -178,6 +178,11 @@ h1, h2, h3 {
   text-wrap: balance;
 }
 
+/* Figma drop shadow for dashboard status pills (Rectangle 111) */
+.shadow-pill {
+  box-shadow: 4px 4px 4px 0 rgba(183, 202, 229, 0.71);
+}
+
 /* Premium soft shadow for elevated surfaces */
 .shadow-premium {
   box-shadow:

@@ -67,45 +67,47 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-7">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">לוח בקרה</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            כל הפרויקטים שבבדיקה — שווי, סיכון ומחיר מומלץ לכל מכרז
-          </p>
+      <div className="space-y-6 rounded-[var(--radius-lg)] bg-[#E3F2FF] p-6 shadow-[0_4px_14px_-2px_rgba(183,202,229,0.7)] dark:bg-[#15233a] dark:shadow-none">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+          <div>
+            <h1 className="text-base font-bold leading-[19px] text-[#1E3A5F] dark:text-slate-100">לוח בקרה</h1>
+            <p className="mt-2 inline-block origin-right text-xs font-normal italic leading-[15px] text-[#1E3A5F] [transform:skewX(-4deg)] dark:text-slate-300">
+              כל הפרויקטים שבבדיקה — שווי, סיכון ומחיר מומלץ לכל מכרז
+            </p>
+          </div>
+          <DataSourcePills status={status} />
         </div>
-        <DataSourcePills status={status} />
-      </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard
-          label="סך שווי קרקע שיורי"
-          value={formatShekelShort(portfolioValue)}
-          sub={`${cards.length} פרויקטים בבדיקה`}
-          icon={IconWallet}
-          accent="primary"
-        />
-        <StatCard
-          label="פרויקטים בניתוח"
-          value={cards.length}
-          sub="פעילים כעת"
-          icon={IconStack}
-          accent="accent"
-        />
-        <StatCard
-          label="הסתברות הפסד ממוצעת"
-          value={formatPct(avgLoss)}
-          sub="ממוצע תיק משוקלל"
-          icon={IconRisk}
-          accent={avgLoss > 0.15 ? "danger" : "success"}
-        />
-        <StatCard
-          label="מכרזי רמ״י זמינים"
-          value={formatNumber(openTenders)}
-          sub={`מתוך ${formatNumber(rmiTotals.total)} פרויקטי רמ״י`}
-          icon={IconDoc}
-          accent="warning"
-        />
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard
+            label="סך שווי קרקע שיורי"
+            value={formatShekelShort(portfolioValue)}
+            sub={`${cards.length} פרויקטים בבדיקה`}
+            icon={IconWallet}
+            accent="primary"
+          />
+          <StatCard
+            label="פרויקטים בניתוח"
+            value={cards.length}
+            sub="פעילים כעת"
+            icon={IconStack}
+            accent="accent"
+          />
+          <StatCard
+            label="הסתברות הפסד ממוצעת"
+            value={formatPct(avgLoss)}
+            sub="ממוצע תיק משוקלל"
+            icon={IconRisk}
+            accent={avgLoss > 0.15 ? "danger" : "success"}
+          />
+          <StatCard
+            label="מכרזי רמ״י זמינים"
+            value={formatNumber(openTenders)}
+            sub={`מתוך ${formatNumber(rmiTotals.total)} פרויקטי רמ״י`}
+            icon={IconDoc}
+            accent="warning"
+          />
+        </div>
       </div>
 
       <section className="space-y-4">

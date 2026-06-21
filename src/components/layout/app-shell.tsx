@@ -59,19 +59,20 @@ export function AppShell({
     <div className="min-h-screen app-aurora">
       <div className="mx-auto flex min-h-screen w-full max-w-[1600px]">
         {/* Sidebar */}
-        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-l border-border bg-card/40 px-4 py-5 backdrop-blur-xl lg:flex">
+        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-white px-4 py-5 lg:flex dark:bg-background">
           <Link href="/dashboard" className="px-2">
             <Logo />
           </Link>
 
-          <Button asChild className="mt-7 gap-2" size="lg">
-            <Link href={user ? "/projects/new" : "/login?mode=register&next=%2Fprojects%2Fnew"}>
-              <IconNew className="size-[18px]" />
-              עסקה חדשה
-            </Link>
-          </Button>
+          <Link
+            href={user ? "/projects/new" : "/login?mode=register&next=%2Fprojects%2Fnew"}
+            className="shadow-pill mt-7 flex w-full items-center gap-3 rounded-lg bg-[#1E3A5F] px-3 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          >
+            <IconNew className="size-[18px] shrink-0 text-white" />
+            <span className="flex-1 text-right">עסקה חדשה</span>
+          </Link>
 
-          <nav className="mt-6 flex flex-col gap-1">
+          <nav className="mt-4 flex flex-col gap-2">
             {NAV.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
@@ -79,20 +80,20 @@ export function AppShell({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 rounded-[var(--radius-md)] px-3 py-2.5 text-sm font-medium transition-colors",
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#1E3A5F] transition-colors dark:text-slate-100",
                     active
-                      ? "bg-primary/12 text-primary"
-                      : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                      ? "bg-[#E3F2FF] dark:bg-[#15233a]"
+                      : "shadow-pill bg-white hover:bg-[#E3F2FF]/60 dark:bg-card dark:shadow-none dark:hover:bg-[#15233a]/80",
                   )}
                 >
-                  <item.icon className="size-[18px]" />
-                  {item.label}
+                  <item.icon className="size-[18px] shrink-0 text-[#1E3A5F] dark:text-slate-100" />
+                  <span className="flex-1 text-right">{item.label}</span>
                 </Link>
               );
             })}
           </nav>
 
-          <div className="mt-auto rounded-[var(--radius-lg)] border border-border bg-card/60 p-3">
+          <div className="shadow-pill mt-auto rounded-lg bg-white p-3 dark:bg-card dark:shadow-none">
             {user ? (
               <div className="flex items-center gap-3">
                 <div className="grid size-9 place-items-center rounded-full bg-primary/15 font-semibold text-primary">

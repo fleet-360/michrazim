@@ -222,12 +222,15 @@ h1, h2, h3 {
 }
 
 .slider-range-brand {
-  background: linear-gradient(
+  background-image: linear-gradient(
     90deg,
-    var(--slider-range-start) 0%,
-    var(--slider-range-mid) 52%,
-    var(--slider-range-end) 100%
+    #e3f2ff 0%,
+    #b7cae5 22%,
+    #7f8fe3 52%,
+    #5268dc 78%,
+    #394fd4 100%
   );
+  background-repeat: no-repeat;
 }
 
 .dark .slider-track-brand {
@@ -236,7 +239,8 @@ h1, h2, h3 {
 }
 
 .dark .slider-range-brand {
-  background: linear-gradient(90deg, #4c5f8a 0%, #394fd4 100%);
+  background-image: linear-gradient(90deg, #4c5f8a 0%, #5a6fe0 55%, #394fd4 100%);
+  background-repeat: no-repeat;
 }
 
 .slider-thumb-brand {

@@ -86,6 +86,18 @@ const workspacePrimaryBtn =
 const workspacePanel =
   "workspace-panel-bg shadow-card rounded-[5px] p-6 dark:shadow-none";
 
+const workspaceTabList =
+  "shadow-pill inline-flex h-auto w-full flex-wrap items-center justify-start gap-1 rounded-[5px] bg-white p-1 dark:bg-card dark:shadow-none";
+
+const workspaceTabTrigger =
+  "gap-1.5 rounded-[5px] px-3 py-2 text-xs font-medium text-[#1E3A5F] shadow-none transition-colors data-[state=active]:bg-[#1E3A5F] data-[state=active]:text-white dark:text-slate-200 dark:data-[state=active]:bg-[#1E3A5F] dark:data-[state=active]:text-white [&_svg]:size-3.5";
+
+const workspaceTabPanel =
+  "shadow-card rounded-[5px] border-0 bg-white dark:bg-card dark:shadow-none";
+
+const workspaceMapFrame =
+  "shadow-card h-[460px] overflow-hidden rounded-[5px] border border-[#394FD4]/30 dark:border-[#394FD4]/45";
+
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = React.useState(value);
   React.useEffect(() => {
@@ -404,25 +416,49 @@ export function ProjectWorkspace(props: WorkspaceProps) {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="map">
-        <div className="overflow-x-auto">
-          <TabsList>
-            <TabsTrigger value="map"><Boxes className="ms-1" />מפה ותלת-ממד</TabsTrigger>
-            <TabsTrigger value="overview"><LayoutDashboard className="ms-1" />סקירה</TabsTrigger>
-            <TabsTrigger value="rights"><Layers className="ms-1" />זכויות</TabsTrigger>
-            <TabsTrigger value="costs"><Coins className="ms-1" />עלויות</TabsTrigger>
-            <TabsTrigger value="feasibility"><LineChart className="ms-1" />היתכנות</TabsTrigger>
-            <TabsTrigger value="risk"><ShieldAlert className="ms-1" />סיכונים</TabsTrigger>
-            <TabsTrigger value="market"><TrendingUp className="ms-1" />שוק</TabsTrigger>
-            <TabsTrigger value="decision"><FileText className="ms-1" />החלטה</TabsTrigger>
-          </TabsList>
-        </div>
+      <div className={cn(workspacePanel, "space-y-4")}>
+        <Tabs defaultValue="map" className="space-y-4">
+          <div className="overflow-x-auto">
+            <TabsList className={workspaceTabList}>
+              <TabsTrigger className={workspaceTabTrigger} value="map">
+                <Boxes className="shrink-0" />
+                מפה ותלת-ממד
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="overview">
+                <LayoutDashboard className="shrink-0" />
+                סקירה
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="rights">
+                <Layers className="shrink-0" />
+                זכויות
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="costs">
+                <Coins className="shrink-0" />
+                עלויות
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="feasibility">
+                <LineChart className="shrink-0" />
+                היתכנות
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="risk">
+                <ShieldAlert className="shrink-0" />
+                סיכונים
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="market">
+                <TrendingUp className="shrink-0" />
+                שוק
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="decision">
+                <FileText className="shrink-0" />
+                החלטה
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-        {/* MAP / 3D */}
-        <TabsContent value="map">
-          <Card className="overflow-hidden p-0">
-            <div className="grid lg:grid-cols-[2fr_1fr]">
-              <div className="h-[460px]">
+          {/* MAP / 3D */}
+          <TabsContent value="map" className="mt-0 focus-visible:ring-0">
+            <div className="grid gap-4 lg:grid-cols-[1.65fr_1fr]">
+              <div className={workspaceMapFrame}>
                 <DynamicMap
                   lat={props.lat}
                   lng={props.lng}
@@ -435,33 +471,36 @@ export function ProjectWorkspace(props: WorkspaceProps) {
                   comparables={props.comparables.filter((c) => c.lat && c.lng).slice(0, 12)}
                 />
               </div>
-              <div className="space-y-3 p-5">
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="size-4 text-primary" />
-                  הדמיית מסה
-                </CardTitle>
-                <CardDescription>
+              <div dir="rtl" className={cn(workspaceTabPanel, "flex min-h-[460px] w-full flex-col p-5")}>
+                <h3 className="w-full text-start text-base font-bold text-[#1E3A5F] dark:text-slate-100">
+                  <span className="inline-flex items-center gap-2">
+                    <Building2 className="size-4 shrink-0" />
+                    הדמיית מסה
+                  </span>
+                </h3>
+                <p className={cn("mt-2 w-full text-start text-sm text-[#5A7184] dark:text-slate-400", detailItalic)}>
                   נפח הבנייה האפשרי על המגרש לפי הזכויות — {det.rights.units} יח״ד ב-{massingFloors} קומות.
-                </CardDescription>
-                <dl className="space-y-2.5 pt-2 text-sm">
-                  <Row label="שטח מגרש" value={`${formatNumber(props.plotAreaSqm)} מ״ר`} />
-                  <Row label="שטח בנוי כולל" value={`${formatNumber(Math.round(det.rights.totalBuiltSqm))} מ״ר`} />
-                  <Row label="שטח מכר למגורים" value={`${formatNumber(Math.round(det.rights.sellableResidentialSqm))} מ״ר`} />
-                  <Row label="גובה משוער" value={`~${massingHeight} מ׳`} />
-                  <Row label="חניות" value={formatNumber(det.rights.parkingSpaces)} />
+                </p>
+                <dl className="mt-4 w-full space-y-3">
+                  <MassingRow label="שטח מגרש" value={`${formatNumber(props.plotAreaSqm)} מ״ר`} />
+                  <MassingRow label="שטח בנוי כולל" value={`${formatNumber(Math.round(det.rights.totalBuiltSqm))} מ״ר`} />
+                  <MassingRow label="שטח מכר למגורים" value={`${formatNumber(Math.round(det.rights.sellableResidentialSqm))} מ״ר`} />
+                  <MassingRow label="גובה משוער" value={`~${massingHeight} מ׳`} />
+                  <MassingRow label="חניות" value={formatNumber(det.rights.parkingSpaces)} />
                 </dl>
-                <div className="rounded-[var(--radius-md)] bg-muted/50 p-3 text-xs text-muted-foreground">
-                  המגרש מסומן על מפה אמיתית · הנקודות הכתומות הן עסקאות השוואה באזור.
+                <div className="shadow-card mt-auto w-full rounded-[5px] bg-[#E3F2FF] p-3 text-start text-xs leading-relaxed text-[#5A7184] dark:bg-secondary/40 dark:text-slate-400 dark:shadow-none">
+                  <span className={detailItalic}>
+                    המגרש מסומן על מפה אמיתית · הנקודות הכתומות הן עסקאות השוואה באזור.
+                  </span>
                 </div>
               </div>
             </div>
-          </Card>
-        </TabsContent>
+          </TabsContent>
 
         {/* OVERVIEW */}
-        <TabsContent value="overview">
+        <TabsContent value="overview" className="mt-0 focus-visible:ring-0">
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
+            <Card className={workspaceTabPanel}>
               <CardHeader>
                 <CardTitle>מד ההצעה — קללת המנצח</CardTitle>
                 <CardDescription>היכן ההצעה שלך ביחס לטווח הממושמע ולשוק</CardDescription>
@@ -470,7 +509,7 @@ export function ProjectWorkspace(props: WorkspaceProps) {
                 <BidGauge rec={rec} currentBid={bid} />
               </CardContent>
             </Card>
-            <Card>
+            <Card className={workspaceTabPanel}>
               <CardHeader>
                 <CardTitle>ציון העסקה ותקציר כלכלי</CardTitle>
                 <CardDescription>במחיר ההצעה הנוכחי</CardDescription>
@@ -499,8 +538,8 @@ export function ProjectWorkspace(props: WorkspaceProps) {
         </TabsContent>
 
         {/* RIGHTS */}
-        <TabsContent value="rights">
-          <Card>
+        <TabsContent value="rights" className="mt-0 focus-visible:ring-0">
+          <Card className={workspaceTabPanel}>
             <CardHeader>
               <CardTitle>זכויות בנייה — מהנייר למ״ר מכר</CardTitle>
               <CardDescription>הפער בין הזכויות התכנוניות לשטח שבאמת נמכר</CardDescription>
@@ -519,8 +558,8 @@ export function ProjectWorkspace(props: WorkspaceProps) {
         </TabsContent>
 
         {/* COSTS */}
-        <TabsContent value="costs">
-          <Card>
+        <TabsContent value="costs" className="mt-0 focus-visible:ring-0">
+          <Card className={workspaceTabPanel}>
             <CardHeader>
               <CardTitle>מבנה העלויות — חשיפת העלויות הנסתרות</CardTitle>
               <CardDescription>
@@ -535,8 +574,8 @@ export function ProjectWorkspace(props: WorkspaceProps) {
         </TabsContent>
 
         {/* FEASIBILITY */}
-        <TabsContent value="feasibility">
-          <Card>
+        <TabsContent value="feasibility" className="mt-0 focus-visible:ring-0">
+          <Card className={workspaceTabPanel}>
             <CardHeader>
               <CardTitle>תזרים מזומנים ו-IRR</CardTitle>
               <CardDescription>
@@ -582,9 +621,9 @@ export function ProjectWorkspace(props: WorkspaceProps) {
         </TabsContent>
 
         {/* RISK */}
-        <TabsContent value="risk">
+        <TabsContent value="risk" className="mt-0 focus-visible:ring-0">
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
+            <Card className={workspaceTabPanel}>
               <CardHeader>
                 <CardTitle>התפלגות הרווח — {formatNumber(mc.runs)} תרחישים</CardTitle>
                 <CardDescription>סימולציית מונטה-קרלו על המשתנים הלא-ודאיים</CardDescription>
@@ -598,7 +637,7 @@ export function ProjectWorkspace(props: WorkspaceProps) {
                 </div>
               </CardContent>
             </Card>
-            <Card>
+            <Card className={workspaceTabPanel}>
               <CardHeader>
                 <CardTitle>ניתוח רגישות (Tornado)</CardTitle>
                 <CardDescription>אילו אי-ודאויות באמת מזיזות את הרווח</CardDescription>
@@ -611,23 +650,15 @@ export function ProjectWorkspace(props: WorkspaceProps) {
         </TabsContent>
 
         {/* MARKET */}
-        <TabsContent value="market">
-          <Card>
-            <CardHeader>
-              <CardTitle>עסקאות השוואה — {props.city}</CardTitle>
-              <CardDescription>בסיס לתמחור ההכנסות הצפויות</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ComparablesTable comparables={props.comparables} />
-            </CardContent>
-          </Card>
+        <TabsContent value="market" className="mt-0 focus-visible:ring-0">
+          <ComparablesTable comparables={props.comparables} city={props.city} />
         </TabsContent>
 
         {/* DECISION */}
-        <TabsContent value="decision">
+        <TabsContent value="decision" className="mt-0 focus-visible:ring-0">
           <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
             <AiPanel projectId={props.id} />
-            <Card className="h-fit">
+            <Card className={cn(workspaceTabPanel, "h-fit")}>
               <CardHeader>
                 <CardTitle>סיכום החלטה</CardTitle>
               </CardHeader>
@@ -654,6 +685,7 @@ export function ProjectWorkspace(props: WorkspaceProps) {
           </div>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }
@@ -713,6 +745,15 @@ function LiveStat({
       <div className={cn("mt-0.5 font-display text-lg font-bold tnum", toneCls)}>
         {animate !== undefined && format ? <AnimatedNumber value={animate} format={format} /> : value}
       </div>
+    </div>
+  );
+}
+
+function MassingRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex w-full items-center justify-between gap-3 text-start">
+      <dt className={cn("text-sm text-[#5A7184] dark:text-slate-400", detailItalic)}>{label}</dt>
+      <dd className="shrink-0 text-sm font-bold tnum text-[#1E3A5F] dark:text-slate-100">{value}</dd>
     </div>
   );
 }

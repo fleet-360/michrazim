@@ -45,6 +45,19 @@
   --chart-6: 340 75% 55%;
 
   --radius: 0.85rem;
+
+  /* Figma brand / card tokens */
+  --brand-blue: #394FD4;
+  --card-accent: #7F8FE3;
+  --card-shadow: 0 4px 4px 0 rgb(183 202 229 / 0.7); /* #B7CAE5 @ 70% */
+
+  /* Workspace bid panel + sliders */
+  --workspace-panel-top: #eef7ff;
+  --workspace-panel-bottom: #d9ebfc;
+  --slider-track: #ffffff;
+  --slider-range-start: #c5daf4;
+  --slider-range-mid: #7f8fe3;
+  --slider-range-end: #394fd4;
 }
 
 .dark {
@@ -178,6 +191,77 @@ h1, h2, h3 {
   text-wrap: balance;
 }
 
+/* Figma drop shadow for dashboard status pills (Rectangle 111) */
+.shadow-pill {
+  box-shadow: 4px 4px 4px 0 rgba(183, 202, 229, 0.71);
+}
+
+/* Figma drop shadow for project cards — 0 4px 4px #B7CAE5 @ 70% */
+.shadow-card {
+  box-shadow: var(--card-shadow);
+}
+
+/* Workspace summary panel — soft vertical gradient */
+.workspace-panel-bg {
+  background: linear-gradient(
+    165deg,
+    var(--workspace-panel-top) 0%,
+    #e3f2ff 48%,
+    var(--workspace-panel-bottom) 100%
+  );
+}
+
+.dark .workspace-panel-bg {
+  background: linear-gradient(165deg, #1a2940 0%, #15233a 55%, #111b2c 100%);
+}
+
+/* Brand sliders — white trough + blue-violet fill gradient */
+.slider-track-brand {
+  background: var(--slider-track);
+  box-shadow: inset 0 1px 3px rgb(183 202 229 / 0.55);
+}
+
+.slider-range-brand {
+  background-image: linear-gradient(
+    90deg,
+    #e3f2ff 0%,
+    #b7cae5 22%,
+    #7f8fe3 52%,
+    #5268dc 78%,
+    #394fd4 100%
+  );
+  background-repeat: no-repeat;
+}
+
+.dark .slider-track-brand {
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35);
+}
+
+.dark .slider-range-brand {
+  background-image: linear-gradient(90deg, #4c5f8a 0%, #5a6fe0 55%, #394fd4 100%);
+  background-repeat: no-repeat;
+}
+
+.slider-thumb-brand {
+  border: 2px solid #ffffff;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 3px rgb(183 202 229 / 0.55),
+    0 2px 8px rgb(57 79 212 / 0.28);
+}
+
+.dark .slider-thumb-brand {
+  border-color: #394fd4;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgb(57 79 212 / 0.35);
+}
+
+.workspace-scenario-active {
+  background: linear-gradient(180deg, #2a4568 0%, #1e3a5f 100%);
+  color: #ffffff;
+}
+
 /* Premium soft shadow for elevated surfaces */
 .shadow-premium {
   box-shadow:
@@ -243,6 +327,26 @@ h1, h2, h3 {
   transform: translateX(-100%);
   background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.06), transparent);
   animation: shimmer 1.6s infinite;
+}
+
+/* Indeterminate progress sweep — the bar bounces edge-to-edge inside its track.
+   `transform-box: view-box` keeps the translation in SVG user units. */
+@keyframes loader-sweep {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(614px);
+  }
+}
+.loader-sweep {
+  transform-box: view-box;
+  animation: loader-sweep 1.25s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .loader-sweep {
+    animation: none;
+  }
 }
 
 @media print {

@@ -2,7 +2,12 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/server/auth";
 import { AuthForm } from "@/components/auth/auth-form";
 import { Logo, LogoMark } from "@/components/brand/logo";
-import { IconMarket, IconRisk, IconParcel, IconAI } from "@/components/brand/icons";
+import {
+  IconMarket,
+  IconRisk,
+  IconParcel,
+  IconAI,
+} from "@/components/brand/icons";
 
 export default async function LoginPage({
   searchParams,
@@ -10,15 +15,34 @@ export default async function LoginPage({
   searchParams: Promise<{ mode?: string; next?: string }>;
 }) {
   const { mode, next } = await searchParams;
-  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  const safeNext =
+    next && next.startsWith("/") && !next.startsWith("//")
+      ? next
+      : "/dashboard";
   const session = await getSession();
   if (session) redirect(safeNext);
 
   const features = [
-    { icon: IconMarket, title: "שווי קרקע שיורי", desc: "מנוע חיתום שמחשב כמה הקרקע באמת שווה לך" },
-    { icon: IconRisk, title: "סימולציית סיכון", desc: "מונטה-קרלו: הסתברות הפסד, לא ניחוש" },
-    { icon: IconParcel, title: "הדמיית מסה תלת-ממדית", desc: "המגרש והפרויקט על מפה אמיתית" },
-    { icon: IconAI, title: "אנליסט AI", desc: "דגלים אדומים וניתוח סיכונים אוטומטי" },
+    {
+      icon: IconMarket,
+      title: "שווי קרקע שיורי",
+      desc: "מנוע חיתום שמחשב כמה הקרקע באמת שווה לך",
+    },
+    {
+      icon: IconRisk,
+      title: "סימולציית סיכון",
+      desc: "מונטה-קרלו: הסתברות הפסד, לא ניחוש",
+    },
+    {
+      icon: IconParcel,
+      title: "הדמיית מסה תלת-ממדית",
+      desc: "המגרש והפרויקט על מפה אמיתית",
+    },
+    {
+      icon: IconAI,
+      title: "אנליסט AI",
+      desc: "דגלים אדומים וניתוח סיכונים אוטומטי",
+    },
   ];
 
   return (
@@ -33,8 +57,7 @@ export default async function LoginPage({
           }}
         />
         <div className="relative flex items-center gap-3">
-          <LogoMark className="size-9" />
-          <span className="font-display text-2xl font-extrabold">רדיוס</span>
+          <LogoMark className="h-9 w-auto text-white" />
         </div>
 
         <div className="relative space-y-8">
@@ -45,13 +68,16 @@ export default async function LoginPage({
               נשמר — או נשרף.
             </h1>
             <p className="mt-4 max-w-md text-lg text-white/80">
-              מערכת חיתום והערכת מכרזים שמגלה את העלויות הנסתרות, מתמחרת את הסיכון,
-              ומונעת מכם לשלם יותר מדי במכרז.
+              מערכת חיתום והערכת מכרזים שמגלה את העלויות הנסתרות, מתמחרת את
+              הסיכון, ומונעת מכם לשלם יותר מדי במכרז.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             {features.map((f) => (
-              <div key={f.title} className="rounded-[var(--radius-lg)] bg-white/10 p-4 backdrop-blur">
+              <div
+                key={f.title}
+                className="rounded-[var(--radius-lg)] bg-white/10 p-4 backdrop-blur"
+              >
                 <f.icon className="size-5" />
                 <div className="mt-2 font-semibold">{f.title}</div>
                 <div className="text-sm text-white/70">{f.desc}</div>
@@ -73,9 +99,13 @@ export default async function LoginPage({
           </div>
           <h2 className="font-display text-2xl font-bold">כניסה / הרשמה</h2>
           <p className="mb-7 mt-1 text-sm text-muted-foreground">
-            צפייה וניתוח פתוחים לכולם — חשבון נדרש רק כדי לשמור פרויקטים ומועדפים
+            צפייה וניתוח פתוחים לכולם — חשבון נדרש רק כדי לשמור פרויקטים
+            ומועדפים
           </p>
-          <AuthForm mode={mode === "register" ? "register" : "login"} next={next} />
+          <AuthForm
+            mode={mode === "register" ? "register" : "login"}
+            next={next}
+          />
         </div>
       </div>
     </div>

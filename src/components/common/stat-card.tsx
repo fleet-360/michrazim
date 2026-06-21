@@ -1,6 +1,5 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
 
 export function StatCard({
   label,
@@ -18,28 +17,39 @@ export function StatCard({
   className?: string;
 }) {
   const accentMap: Record<string, string> = {
-    primary: "text-primary bg-primary/12",
-    success: "text-success bg-success/12",
-    warning: "text-[hsl(var(--warning))] bg-warning/12",
-    danger: "text-danger bg-danger/12",
-    accent: "text-[hsl(var(--accent))] bg-accent/12",
+    primary: "bg-[#EDE7FF] text-[#6D5BD0]",
+    accent: "bg-[#FFEDD5] text-[#EA580C]",
+    warning: "bg-[#FEF3C7] text-[#D97706]",
+    danger: "bg-[#FEE2E2] text-[#DC2626]",
+    success: "bg-[#DCFCE7] text-[#16A34A]",
   };
+
   return (
-    <Card className={cn("p-4", className)}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-xs font-medium text-muted-foreground">{label}</div>
-          <div className="mt-1 truncate whitespace-nowrap font-display text-[1.4rem] font-bold leading-tight tracking-tight tnum">
-            {value}
-          </div>
-          {sub && <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>}
-        </div>
+    <div
+      className={cn(
+        "shadow-pill rounded-xl bg-white p-5 text-right dark:bg-card dark:shadow-none",
+        className,
+      )}
+    >
+      <div className="flex w-full flex-col items-start">
         {Icon && (
-          <div className={cn("grid size-9 shrink-0 place-items-center rounded-[var(--radius-md)]", accentMap[accent])}>
+          <div
+            className={cn(
+              "mb-3 grid size-9 shrink-0 place-items-center rounded-lg",
+              accentMap[accent],
+            )}
+          >
             <Icon className="size-[18px]" />
           </div>
         )}
+        <div className="w-full text-right text-sm font-medium leading-snug text-[#5A7184] dark:text-slate-400">{label}</div>
+        <div className="mt-1 w-full truncate whitespace-nowrap text-right text-2xl font-bold leading-tight text-[#1E3A5F] tnum dark:text-slate-100">
+          {value}
+        </div>
+        {sub && (
+          <div className="mt-1 w-full text-right text-xs leading-snug text-[#5A7184] dark:text-slate-400">{sub}</div>
+        )}
       </div>
-    </Card>
+    </div>
   );
 }

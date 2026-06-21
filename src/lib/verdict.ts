@@ -11,9 +11,9 @@ export const VERDICT_META: Record<
 };
 
 export const TRACK_META: Record<Track, { label: string; color: string }> = {
-  RMI: { label: "מכרז רמ״י", color: "hsl(var(--chart-1))" },
-  URBAN_RENEWAL: { label: "התחדשות עירונית", color: "hsl(var(--chart-4))" },
-  PRIVATE: { label: "קרקע פרטית", color: "hsl(var(--chart-3))" },
+  RMI: { label: "מכרז רמ״י", color: "#7F8FE3" },
+  URBAN_RENEWAL: { label: "התחדשות עירונית", color: "#7C3AED" },
+  PRIVATE: { label: "קרקע פרטית", color: "#15803D" },
 };
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));

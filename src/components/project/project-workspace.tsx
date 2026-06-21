@@ -4,13 +4,13 @@ import * as React from "react";
 import Link from "next/link";
 import {
   MapPin, Boxes, LayoutDashboard, Layers, Coins, LineChart, ShieldAlert,
-  TrendingUp, FileText, Building2, Save, Check,
+  TrendingUp, FileText, Building2, Save, Check, PlusCircle,
 } from "lucide-react";
 import { analyzeDeal } from "@/lib/engine";
 import type { DealInputs, FeeSchedule, Track } from "@/lib/engine/types";
+import type { Verdict } from "@/lib/engine";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { VerdictBadge } from "@/components/common/verdict-badge";
@@ -58,6 +58,45 @@ export interface WorkspaceProps {
     sizeSqm?: number; rooms?: number; dealDate?: string; neighborhood?: string;
   }[];
 }
+
+const TRACK_BADGE_DOT: Record<Track, string> = {
+  RMI: "bg-white",
+  URBAN_RENEWAL: "bg-white",
+  PRIVATE: "bg-white",
+};
+
+const VERDICT_PILL: Record<Verdict, string> = {
+  GO: "border-0 bg-[#D4FEEE] text-[#15803D]",
+  CONDITIONAL: "border-0 bg-[#FEF3C7] text-[hsl(var(--warning))]",
+  NO_GO: "border-0 bg-[#FEE2E2] text-danger",
+};
+
+const detailItalic =
+  "inline-block origin-right italic leading-snug [transform:skewX(-4deg)]";
+
+const workspaceIconBtn =
+  "shadow-pill size-9 shrink-0 rounded-[5px] border-0 bg-white text-[#1E3A5F] hover:bg-white/90 dark:bg-card dark:text-slate-200 dark:shadow-none";
+
+const workspaceOutlineBtn =
+  "shadow-pill h-9 gap-1.5 rounded-[5px] border-0 bg-white px-3 text-xs font-medium text-[#1E3A5F] hover:bg-white/90 dark:bg-card dark:text-slate-200 dark:shadow-none";
+
+const workspacePrimaryBtn =
+  "shadow-pill h-9 gap-1.5 rounded-[5px] bg-[#1E3A5F] px-3 text-xs font-medium text-white hover:bg-[#1E3A5F]/90 dark:shadow-none";
+
+const workspacePanel =
+  "workspace-panel-bg shadow-card rounded-[5px] p-6 dark:shadow-none";
+
+const workspaceTabList =
+  "shadow-pill inline-flex h-auto w-full flex-wrap items-center justify-start gap-1 rounded-[5px] bg-white p-1 dark:bg-card dark:shadow-none";
+
+const workspaceTabTrigger =
+  "gap-1.5 rounded-[5px] px-3 py-2 text-xs font-medium text-[#1E3A5F] shadow-none transition-colors data-[state=active]:bg-[#1E3A5F] data-[state=active]:text-white dark:text-slate-200 dark:data-[state=active]:bg-[#1E3A5F] dark:data-[state=active]:text-white [&_svg]:size-3.5";
+
+const workspaceTabPanel =
+  "shadow-card rounded-[5px] border-0 bg-white dark:bg-card dark:shadow-none";
+
+const workspaceMapFrame =
+  "shadow-card h-[460px] overflow-hidden rounded-[5px] border border-[#394FD4]/30 dark:border-[#394FD4]/45";
 
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = React.useState(value);
@@ -220,38 +259,59 @@ export function ProjectWorkspace(props: WorkspaceProps) {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="gap-1">
-              <span className="size-1.5 rounded-full" style={{ background: track.color }} />
+        <div className="space-y-2 text-right">
+          <div className="flex items-center justify-start gap-2">
+            <span
+              className="shadow-pill inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium text-white dark:shadow-none"
+              style={{ background: track.color }}
+            >
+              <span className={cn("size-1.5 shrink-0 rounded-full", TRACK_BADGE_DOT[props.track])} />
               {track.label}
-            </Badge>
-            <VerdictBadge verdict={analysis.verdict} />
+            </span>
+            <VerdictBadge
+              verdict={analysis.verdict}
+              className={cn(
+                "shadow-pill shrink-0 rounded-full border-0 px-2.5 dark:shadow-none",
+                VERDICT_PILL[analysis.verdict],
+              )}
+            />
           </div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">{props.name}</h1>
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <MapPin className="size-4" />
-            {props.address || props.city}
-            {props.inputs.rights && (
-              <>
-                <span className="mx-1">·</span>
-                {formatNumber(props.plotAreaSqm)} מ״ר · {det.rights.units} יח״ד
-              </>
-            )}
+          <h1 className="text-lg font-bold leading-snug text-[#1E3A5F] dark:text-slate-100">{props.name}</h1>
+          <div className="flex items-center justify-start gap-1.5 text-sm text-[#1E3A5F] dark:text-slate-200">
+            <MapPin className="size-3.5 shrink-0" />
+            <span className={detailItalic}>
+              {props.address || props.city}
+              {props.inputs.rights && (
+                <>
+                  {" · "}
+                  {formatNumber(props.plotAreaSqm)} מ״ר · {det.rights.units} יח״ד
+                </>
+              )}
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <DeleteProject id={props.id} name={props.name} />
-          <Button variant="outline" size="icon" aria-label="ייצוא ל-Excel" onClick={exportXlsx} className="text-muted-foreground hover:text-success">
+          <DeleteProject
+            id={props.id}
+            name={props.name}
+            triggerClassName={cn(workspaceIconBtn, "hover:text-danger")}
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="ייצוא ל-Excel"
+            onClick={exportXlsx}
+            className={workspaceIconBtn}
+          >
             <FileSpreadsheet className="size-4" />
           </Button>
-          <Button variant="outline" className="gap-2" onClick={save} disabled={saving}>
+          <Button variant="outline" className={workspaceOutlineBtn} onClick={save} disabled={saving}>
             {saved ? <Check className="size-4 text-success" /> : <Save className="size-4" />}
             שמירה
           </Button>
-          <Button asChild className="gap-2">
+          <Button asChild className={workspacePrimaryBtn}>
             <Link href={`/projects/${props.id}/report`}>
-              <FileText className="size-4" />
+              <PlusCircle className="size-4" />
               דוח החלטה
             </Link>
           </Button>
@@ -259,50 +319,65 @@ export function ProjectWorkspace(props: WorkspaceProps) {
       </div>
 
       {/* Live bid control bar */}
-      <Card className="overflow-hidden border-primary/20">
-        <div className="grid gap-5 p-5 lg:grid-cols-[1.4fr_1fr]">
-          <div className="space-y-4">
-            <div className="flex items-end justify-between">
-              <div>
-                <div className="text-xs font-medium text-muted-foreground">מחיר ההצעה למכרז</div>
-                <div className="font-display text-3xl font-bold tnum">{formatShekelShort(bid)}</div>
+      <div className={workspacePanel}>
+        <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+          <div className="space-y-5">
+            <div className="flex items-end justify-between gap-4">
+              <div className="text-right">
+                <div className={cn("text-xs text-[#5A7184] dark:text-slate-400", detailItalic)}>
+                  מחיר ההצעה למכרז
+                </div>
+                <div className="mt-1 text-2xl font-bold leading-none tnum text-[#1E3A5F] dark:text-slate-100">
+                  {formatShekelShort(bid)}
+                </div>
               </div>
-              <div className="text-left text-xs text-muted-foreground">
-                שווי קרקע שיורי
+              <div className="text-left">
+                <div className={cn("text-xs text-[#5A7184] dark:text-slate-400", detailItalic)}>שווי קרקע שיורי</div>
                 <AnimatedNumber
                   value={det.maxLandValue}
                   format={formatShekelShort}
-                  className="block font-display text-base font-bold text-primary"
+                  className="mt-1 block text-base font-bold leading-none tnum text-[#394FD4]"
                 />
               </div>
             </div>
             <Slider
+              variant="brand"
               value={[bid]}
               min={0}
               max={bidMax}
               step={Math.max(50000, Math.round(bidMax / 200))}
               onValueChange={(v) => setBid(v[0])}
             />
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>רמת סיכון</span>
-              <div className="flex items-center gap-3">
-                <span>שמרני</span>
-                <div className="w-32">
-                  <Slider value={[risk]} min={0} max={1} step={0.05} onValueChange={(v) => setRisk(v[0])} />
+            <div className="flex items-center justify-between gap-3 text-xs text-[#5A7184] dark:text-slate-400">
+              <span className={detailItalic}>רמת סיכון</span>
+              <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+                <span className={detailItalic}>שמרני</span>
+                <div className="w-full max-w-[180px]">
+                  <Slider
+                    variant="brand"
+                    value={[risk]}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    onValueChange={(v) => setRisk(v[0])}
+                  />
                 </div>
-                <span>אגרסיבי</span>
+                <span className={detailItalic}>אגרסיבי</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 rounded-[var(--radius-md)] bg-muted/50 p-1">
+            <div className="shadow-pill flex items-center gap-1 rounded-[5px] bg-white p-1 dark:bg-card dark:shadow-none">
               {(Object.keys(SCENARIO_META) as ScenarioKey[]).map((k) => (
                 <button
                   key={k}
+                  type="button"
                   onClick={() => setScenario(k)}
                   title={SCENARIO_META[k].desc}
                   className={cn(
-                    "flex-1 rounded-[var(--radius-sm)] px-2 py-1.5 text-xs font-medium transition-colors",
-                    scenario === k ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                    "flex-1 rounded-[5px] px-2 py-1.5 text-xs font-medium transition-colors",
+                    scenario === k
+                      ? "workspace-scenario-active shadow-none"
+                      : "bg-transparent text-[#5A7184] hover:text-[#1E3A5F] dark:text-slate-400 dark:hover:text-slate-200",
                   )}
                 >
                   {SCENARIO_META[k].label}
@@ -312,34 +387,78 @@ export function ProjectWorkspace(props: WorkspaceProps) {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <LiveStat label="מרווח על העלות" animate={ev.marginOnCost} format={(v) => formatPct(v)} tone={ev.marginOnCost < inputs.requiredProfitMarginOnCost ? "warn" : "good"} />
-            <LiveStat label="IRR" animate={ev.irr} format={(v) => formatPct(v)} tone={ev.irr < 0.12 ? "warn" : "good"} />
-            <LiveStat label="הסתברות הפסד" animate={mc.probabilityOfLoss} format={(v) => formatPct(v)} tone={mc.probabilityOfLoss > 0.15 ? "bad" : "good"} />
-            <LiveStat label="רווח חזוי (P50)" animate={mc.profit.p50} format={formatShekelShort} tone={mc.profit.p50 > 0 ? "good" : "bad"} />
+            <SummaryKpi
+              label="מרווח על העלות"
+              animate={ev.marginOnCost}
+              format={(v) => formatPct(v)}
+              tone={ev.marginOnCost < inputs.requiredProfitMarginOnCost ? "warn" : "good"}
+            />
+            <SummaryKpi
+              label="IRR"
+              animate={ev.irr}
+              format={(v) => formatPct(v)}
+              tone={ev.irr < 0.12 ? "warn" : "good"}
+            />
+            <SummaryKpi
+              label="הסתברות הפסד"
+              animate={mc.probabilityOfLoss}
+              format={(v) => formatPct(v)}
+              tone={mc.probabilityOfLoss > 0.15 ? "bad" : "good"}
+            />
+            <SummaryKpi
+              label="רווח חזוי (P50)"
+              animate={mc.profit.p50}
+              format={formatShekelShort}
+              tone={mc.profit.p50 > 0 ? "good" : "bad"}
+            />
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="map">
-        <div className="overflow-x-auto">
-          <TabsList>
-            <TabsTrigger value="map"><Boxes className="ms-1" />מפה ותלת-ממד</TabsTrigger>
-            <TabsTrigger value="overview"><LayoutDashboard className="ms-1" />סקירה</TabsTrigger>
-            <TabsTrigger value="rights"><Layers className="ms-1" />זכויות</TabsTrigger>
-            <TabsTrigger value="costs"><Coins className="ms-1" />עלויות</TabsTrigger>
-            <TabsTrigger value="feasibility"><LineChart className="ms-1" />היתכנות</TabsTrigger>
-            <TabsTrigger value="risk"><ShieldAlert className="ms-1" />סיכונים</TabsTrigger>
-            <TabsTrigger value="market"><TrendingUp className="ms-1" />שוק</TabsTrigger>
-            <TabsTrigger value="decision"><FileText className="ms-1" />החלטה</TabsTrigger>
-          </TabsList>
-        </div>
+      <div className={cn(workspacePanel, "space-y-4")}>
+        <Tabs defaultValue="map" className="space-y-4">
+          <div className="overflow-x-auto">
+            <TabsList className={workspaceTabList}>
+              <TabsTrigger className={workspaceTabTrigger} value="map">
+                <Boxes className="shrink-0" />
+                מפה ותלת-ממד
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="overview">
+                <LayoutDashboard className="shrink-0" />
+                סקירה
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="rights">
+                <Layers className="shrink-0" />
+                זכויות
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="costs">
+                <Coins className="shrink-0" />
+                עלויות
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="feasibility">
+                <LineChart className="shrink-0" />
+                היתכנות
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="risk">
+                <ShieldAlert className="shrink-0" />
+                סיכונים
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="market">
+                <TrendingUp className="shrink-0" />
+                שוק
+              </TabsTrigger>
+              <TabsTrigger className={workspaceTabTrigger} value="decision">
+                <FileText className="shrink-0" />
+                החלטה
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-        {/* MAP / 3D */}
-        <TabsContent value="map">
-          <Card className="overflow-hidden p-0">
-            <div className="grid lg:grid-cols-[2fr_1fr]">
-              <div className="h-[460px]">
+          {/* MAP / 3D */}
+          <TabsContent value="map" className="mt-0 focus-visible:ring-0">
+            <div className="grid gap-4 lg:grid-cols-[1.65fr_1fr]">
+              <div className={workspaceMapFrame}>
                 <DynamicMap
                   lat={props.lat}
                   lng={props.lng}
@@ -352,33 +471,36 @@ export function ProjectWorkspace(props: WorkspaceProps) {
                   comparables={props.comparables.filter((c) => c.lat && c.lng).slice(0, 12)}
                 />
               </div>
-              <div className="space-y-3 p-5">
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="size-4 text-primary" />
-                  הדמיית מסה
-                </CardTitle>
-                <CardDescription>
+              <div dir="rtl" className={cn(workspaceTabPanel, "flex min-h-[460px] w-full flex-col p-5")}>
+                <h3 className="w-full text-start text-base font-bold text-[#1E3A5F] dark:text-slate-100">
+                  <span className="inline-flex items-center gap-2">
+                    <Building2 className="size-4 shrink-0" />
+                    הדמיית מסה
+                  </span>
+                </h3>
+                <p className={cn("mt-2 w-full text-start text-sm text-[#5A7184] dark:text-slate-400", detailItalic)}>
                   נפח הבנייה האפשרי על המגרש לפי הזכויות — {det.rights.units} יח״ד ב-{massingFloors} קומות.
-                </CardDescription>
-                <dl className="space-y-2.5 pt-2 text-sm">
-                  <Row label="שטח מגרש" value={`${formatNumber(props.plotAreaSqm)} מ״ר`} />
-                  <Row label="שטח בנוי כולל" value={`${formatNumber(Math.round(det.rights.totalBuiltSqm))} מ״ר`} />
-                  <Row label="שטח מכר למגורים" value={`${formatNumber(Math.round(det.rights.sellableResidentialSqm))} מ״ר`} />
-                  <Row label="גובה משוער" value={`~${massingHeight} מ׳`} />
-                  <Row label="חניות" value={formatNumber(det.rights.parkingSpaces)} />
+                </p>
+                <dl className="mt-4 w-full space-y-3">
+                  <MassingRow label="שטח מגרש" value={`${formatNumber(props.plotAreaSqm)} מ״ר`} />
+                  <MassingRow label="שטח בנוי כולל" value={`${formatNumber(Math.round(det.rights.totalBuiltSqm))} מ״ר`} />
+                  <MassingRow label="שטח מכר למגורים" value={`${formatNumber(Math.round(det.rights.sellableResidentialSqm))} מ״ר`} />
+                  <MassingRow label="גובה משוער" value={`~${massingHeight} מ׳`} />
+                  <MassingRow label="חניות" value={formatNumber(det.rights.parkingSpaces)} />
                 </dl>
-                <div className="rounded-[var(--radius-md)] bg-muted/50 p-3 text-xs text-muted-foreground">
-                  המגרש מסומן על מפה אמיתית · הנקודות הכתומות הן עסקאות השוואה באזור.
+                <div className="shadow-card mt-auto w-full rounded-[5px] bg-[#E3F2FF] p-3 text-start text-xs leading-relaxed text-[#5A7184] dark:bg-secondary/40 dark:text-slate-400 dark:shadow-none">
+                  <span className={detailItalic}>
+                    המגרש מסומן על מפה אמיתית · הנקודות הכתומות הן עסקאות השוואה באזור.
+                  </span>
                 </div>
               </div>
             </div>
-          </Card>
-        </TabsContent>
+          </TabsContent>
 
         {/* OVERVIEW */}
-        <TabsContent value="overview">
+        <TabsContent value="overview" className="mt-0 focus-visible:ring-0">
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
+            <Card className={workspaceTabPanel}>
               <CardHeader>
                 <CardTitle>מד ההצעה — קללת המנצח</CardTitle>
                 <CardDescription>היכן ההצעה שלך ביחס לטווח הממושמע ולשוק</CardDescription>
@@ -387,7 +509,7 @@ export function ProjectWorkspace(props: WorkspaceProps) {
                 <BidGauge rec={rec} currentBid={bid} />
               </CardContent>
             </Card>
-            <Card>
+            <Card className={workspaceTabPanel}>
               <CardHeader>
                 <CardTitle>ציון העסקה ותקציר כלכלי</CardTitle>
                 <CardDescription>במחיר ההצעה הנוכחי</CardDescription>
@@ -416,8 +538,8 @@ export function ProjectWorkspace(props: WorkspaceProps) {
         </TabsContent>
 
         {/* RIGHTS */}
-        <TabsContent value="rights">
-          <Card>
+        <TabsContent value="rights" className="mt-0 focus-visible:ring-0">
+          <Card className={workspaceTabPanel}>
             <CardHeader>
               <CardTitle>זכויות בנייה — מהנייר למ״ר מכר</CardTitle>
               <CardDescription>הפער בין הזכויות התכנוניות לשטח שבאמת נמכר</CardDescription>
@@ -436,8 +558,8 @@ export function ProjectWorkspace(props: WorkspaceProps) {
         </TabsContent>
 
         {/* COSTS */}
-        <TabsContent value="costs">
-          <Card>
+        <TabsContent value="costs" className="mt-0 focus-visible:ring-0">
+          <Card className={workspaceTabPanel}>
             <CardHeader>
               <CardTitle>מבנה העלויות — חשיפת העלויות הנסתרות</CardTitle>
               <CardDescription>
@@ -452,8 +574,8 @@ export function ProjectWorkspace(props: WorkspaceProps) {
         </TabsContent>
 
         {/* FEASIBILITY */}
-        <TabsContent value="feasibility">
-          <Card>
+        <TabsContent value="feasibility" className="mt-0 focus-visible:ring-0">
+          <Card className={workspaceTabPanel}>
             <CardHeader>
               <CardTitle>תזרים מזומנים ו-IRR</CardTitle>
               <CardDescription>
@@ -499,9 +621,9 @@ export function ProjectWorkspace(props: WorkspaceProps) {
         </TabsContent>
 
         {/* RISK */}
-        <TabsContent value="risk">
+        <TabsContent value="risk" className="mt-0 focus-visible:ring-0">
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
+            <Card className={workspaceTabPanel}>
               <CardHeader>
                 <CardTitle>התפלגות הרווח — {formatNumber(mc.runs)} תרחישים</CardTitle>
                 <CardDescription>סימולציית מונטה-קרלו על המשתנים הלא-ודאיים</CardDescription>
@@ -515,7 +637,7 @@ export function ProjectWorkspace(props: WorkspaceProps) {
                 </div>
               </CardContent>
             </Card>
-            <Card>
+            <Card className={workspaceTabPanel}>
               <CardHeader>
                 <CardTitle>ניתוח רגישות (Tornado)</CardTitle>
                 <CardDescription>אילו אי-ודאויות באמת מזיזות את הרווח</CardDescription>
@@ -528,23 +650,15 @@ export function ProjectWorkspace(props: WorkspaceProps) {
         </TabsContent>
 
         {/* MARKET */}
-        <TabsContent value="market">
-          <Card>
-            <CardHeader>
-              <CardTitle>עסקאות השוואה — {props.city}</CardTitle>
-              <CardDescription>בסיס לתמחור ההכנסות הצפויות</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ComparablesTable comparables={props.comparables} />
-            </CardContent>
-          </Card>
+        <TabsContent value="market" className="mt-0 focus-visible:ring-0">
+          <ComparablesTable comparables={props.comparables} city={props.city} />
         </TabsContent>
 
         {/* DECISION */}
-        <TabsContent value="decision">
+        <TabsContent value="decision" className="mt-0 focus-visible:ring-0">
           <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
             <AiPanel projectId={props.id} />
-            <Card className="h-fit">
+            <Card className={cn(workspaceTabPanel, "h-fit")}>
               <CardHeader>
                 <CardTitle>סיכום החלטה</CardTitle>
               </CardHeader>
@@ -571,6 +685,37 @@ export function ProjectWorkspace(props: WorkspaceProps) {
           </div>
         </TabsContent>
       </Tabs>
+      </div>
+    </div>
+  );
+}
+
+function SummaryKpi({
+  label,
+  value,
+  animate,
+  format,
+  tone = "neutral",
+}: {
+  label: string;
+  value?: string;
+  animate?: number;
+  format?: (v: number) => string;
+  tone?: "good" | "bad" | "warn" | "neutral";
+}) {
+  const toneCls = {
+    good: "text-[#15803D]",
+    bad: "text-danger",
+    warn: "text-[hsl(var(--warning))]",
+    neutral: "text-[#1E3A5F] dark:text-slate-100",
+  }[tone];
+
+  return (
+    <div className="shadow-card rounded-[5px] bg-white p-3 text-right dark:bg-card dark:shadow-none">
+      <div className={cn("text-xs text-[#1E3A5F] dark:text-slate-200", detailItalic)}>{label}</div>
+      <div className={cn("mt-1 text-lg font-bold leading-none tnum", toneCls)}>
+        {animate !== undefined && format ? <AnimatedNumber value={animate} format={format} /> : value}
+      </div>
     </div>
   );
 }
@@ -600,6 +745,15 @@ function LiveStat({
       <div className={cn("mt-0.5 font-display text-lg font-bold tnum", toneCls)}>
         {animate !== undefined && format ? <AnimatedNumber value={animate} format={format} /> : value}
       </div>
+    </div>
+  );
+}
+
+function MassingRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex w-full items-center justify-between gap-3 text-start">
+      <dt className={cn("text-sm text-[#5A7184] dark:text-slate-400", detailItalic)}>{label}</dt>
+      <dd className="shrink-0 text-sm font-bold tnum text-[#1E3A5F] dark:text-slate-100">{value}</dd>
     </div>
   );
 }

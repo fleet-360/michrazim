@@ -3,9 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plus, LogOut, Search } from "lucide-react";
+import { Plus, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/logo";
+import { SearchIcon } from "@/components/brand/search-icon";
 import {
   IconDashboard, IconTender, IconCompare, IconMap, IconMarket, IconFees, IconIntegrations, IconNew,
 } from "@/components/brand/icons";
@@ -58,19 +59,20 @@ export function AppShell({
     <div className="min-h-screen app-aurora">
       <div className="mx-auto flex min-h-screen w-full max-w-[1600px]">
         {/* Sidebar */}
-        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-l border-border bg-card/40 px-4 py-5 backdrop-blur-xl lg:flex">
+        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-white px-4 py-5 lg:flex dark:bg-background">
           <Link href="/dashboard" className="px-2">
             <Logo />
           </Link>
 
-          <Button asChild className="mt-7 gap-2" size="lg">
-            <Link href={user ? "/projects/new" : "/login?mode=register&next=%2Fprojects%2Fnew"}>
-              <IconNew className="size-[18px]" />
-              עסקה חדשה
-            </Link>
-          </Button>
+          <Link
+            href={user ? "/projects/new" : "/login?mode=register&next=%2Fprojects%2Fnew"}
+            className="shadow-pill mt-7 flex w-full items-center gap-3 rounded-lg bg-[#1E3A5F] px-3 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          >
+            <IconNew className="size-[18px] shrink-0 text-white" />
+            <span className="flex-1 text-right">עסקה חדשה</span>
+          </Link>
 
-          <nav className="mt-6 flex flex-col gap-1">
+          <nav className="mt-4 flex flex-col gap-2">
             {NAV.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
@@ -78,20 +80,20 @@ export function AppShell({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 rounded-[var(--radius-md)] px-3 py-2.5 text-sm font-medium transition-colors",
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#1E3A5F] transition-colors dark:text-slate-100",
                     active
-                      ? "bg-primary/12 text-primary"
-                      : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                      ? "bg-[#E3F2FF] dark:bg-[#15233a]"
+                      : "shadow-pill bg-white hover:bg-[#E3F2FF]/60 dark:bg-card dark:shadow-none dark:hover:bg-[#15233a]/80",
                   )}
                 >
-                  <item.icon className="size-[18px]" />
-                  {item.label}
+                  <item.icon className="size-[18px] shrink-0 text-[#1E3A5F] dark:text-slate-100" />
+                  <span className="flex-1 text-right">{item.label}</span>
                 </Link>
               );
             })}
           </nav>
 
-          <div className="mt-auto rounded-[var(--radius-lg)] border border-border bg-card/60 p-3">
+          <div className="shadow-pill mt-auto rounded-lg bg-white p-3 dark:bg-card dark:shadow-none">
             {user ? (
               <div className="flex items-center gap-3">
                 <div className="grid size-9 place-items-center rounded-full bg-primary/15 font-semibold text-primary">
@@ -125,21 +127,22 @@ export function AppShell({
 
         {/* Main */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border bg-background/70 px-5 backdrop-blur-xl">
+          <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 bg-white px-5 dark:bg-background">
             <div className="flex items-center gap-2 lg:hidden">
               <Logo />
             </div>
             <button
               onClick={openCommand}
-              className="hidden min-w-72 items-center gap-2 rounded-[var(--radius-md)] border border-border bg-card/60 px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground lg:flex"
+              className="hidden h-[29px] w-[402px] max-w-full shrink-0 items-center gap-2 rounded-[5px] bg-[#E3F2FF] px-3 transition-colors hover:bg-[#E3F2FF]/80 lg:flex dark:bg-[#15233a] dark:hover:bg-[#15233a]/90"
             >
-              <Search className="size-4" />
-              <span className="flex-1 text-right">חיפוש פרויקטים, ניווט, פעולות…</span>
-              <kbd className="rounded bg-muted px-1.5 py-0.5 text-[10px]">⌘K</kbd>
+              <SearchIcon className="text-black dark:text-white" />
+              <span className="inline-block flex-1 origin-right text-right text-xs font-normal italic leading-none text-[#1E3A5F] [transform:skewX(-4deg)] dark:text-slate-200">
+                חיפוש פרויקטים, ניווט, פעולות…
+              </span>
             </button>
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" className="lg:hidden" aria-label="חיפוש" onClick={openCommand}>
-                <Search className="size-4" />
+                <SearchIcon className="text-foreground" />
               </Button>
               <ThemeToggle />
               {user ? (
@@ -157,7 +160,7 @@ export function AppShell({
             </div>
           </header>
 
-          <main className="flex-1 px-4 pb-28 pt-6 sm:px-5">{children}</main>
+          <main className="flex-1 bg-white px-4 pb-28 pt-6 sm:px-5 dark:bg-background">{children}</main>
         </div>
       </div>
 

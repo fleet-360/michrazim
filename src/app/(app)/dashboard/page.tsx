@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ArrowUpLeft } from "lucide-react";
 import { IconWallet, IconStack, IconRisk, IconDoc, IconCalendar } from "@/components/brand/icons";
 import { getProjects, getCities } from "@/server/queries";
 import { getLiveTenders, getRmiTotals, parseHebDate } from "@/lib/data/rmi";
@@ -10,10 +9,16 @@ import { StatCard } from "@/components/common/stat-card";
 import { type ProjectCardData } from "@/components/common/project-card";
 import { ProjectsFilterGrid } from "@/components/common/projects-filter-grid";
 import { DataSourcePills } from "@/components/common/data-source-pills";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { formatShekelShort, formatPct, formatNumber } from "@/lib/utils";
+import { formatShekelShort, formatPct, formatNumber, cn } from "@/lib/utils";
+
+const tenderHeaderItalic =
+  "inline-block origin-right italic font-medium leading-snug [transform:skewX(-4deg)]";
+
+const tenderRowGrid =
+  "grid w-full min-w-[720px] grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.65fr)_minmax(0,1fr)_minmax(0,0.75fr)_minmax(0,0.9fr)] items-center gap-x-3 text-right text-xs leading-none";
+
+const tenderRowSurface =
+  "shadow-card relative h-[34px] min-h-[34px] rounded-[5px] bg-white px-3 dark:bg-card dark:shadow-none";
 
 export const dynamic = "force-dynamic";
 
@@ -110,71 +115,91 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold">הפרויקטים שלי</h2>
-          <Button asChild variant="ghost" size="sm" className="gap-1">
-            <Link href="/projects/new">
-              עסקה חדשה
-              <ArrowUpLeft className="size-3.5" />
-            </Link>
-          </Button>
-        </div>
+      <section className="space-y-4 rounded-[var(--radius-lg)] bg-[#E3F2FF] p-6 dark:bg-[#15233a]">
+        <h2 className="text-right text-base font-bold text-[#1E3A5F] dark:text-slate-100">הפרויקטים שלי</h2>
         <ProjectsFilterGrid cards={cards} />
       </section>
 
-      <section>
-        <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <IconCalendar className="size-[18px] text-primary" />
-              מכרזי רמ״י אחרונים
-              {tendersLive && (
-                <Badge variant="success" className="gap-1">
-                  <span className="size-1.5 animate-pulse rounded-full bg-success" />
-                  חי · data.gov.il
-                </Badge>
-              )}
-            </CardTitle>
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/tenders">לכל המכרזים</Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="overflow-x-auto p-0">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-y border-border text-right text-xs text-muted-foreground">
-                  <th className="px-5 py-2.5 font-medium">פרויקט</th>
-                  <th className="px-3 py-2.5 font-medium">עיר</th>
-                  <th className="px-3 py-2.5 font-medium">מחוז</th>
-                  <th className="px-3 py-2.5 font-medium">יח״ד</th>
-                  <th className="px-3 py-2.5 font-medium">עלות פיתוח</th>
-                  <th className="px-3 py-2.5 font-medium">תאריך</th>
-                  <th className="px-5 py-2.5 font-medium">סטטוס</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentTenders.map((t) => (
-                  <tr key={t.id} className="relative border-b border-border/60 transition-colors hover:bg-secondary/40">
-                    <td className="max-w-xs truncate px-5 py-3 font-medium">
-                      <Link href={`/tenders/${encodeURIComponent(t.id)}`} className="text-foreground after:absolute after:inset-0 hover:text-primary">
-                        {t.name}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3 text-muted-foreground">{t.city}</td>
-                    <td className="px-3 py-3 text-muted-foreground">{t.district || "—"}</td>
-                    <td className="px-3 py-3 tabular-nums">{t.units || "—"}</td>
-                    <td className="px-3 py-3 tabular-nums">{t.totalDevelopCost ? formatShekelShort(t.totalDevelopCost) : "—"}</td>
-                    <td className="px-3 py-3 tabular-nums text-muted-foreground">{t.tenderDate || "—"}</td>
-                    <td className="px-5 py-3">
-                      <Badge variant={t.status.includes("מכרז") ? "success" : "secondary"}>{t.status}</Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+      <section className="shadow-card min-h-[386px] rounded-[5px] bg-[#E3F2FF] p-6 dark:bg-[#15233a] dark:shadow-none">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="flex items-center justify-start gap-2 text-base font-bold text-[#1E3A5F] dark:text-slate-100">
+            <IconCalendar className="size-[18px] shrink-0 text-[#1E3A5F] dark:text-slate-100" />
+            מכרזי רמ״י אחרונים
+          </h2>
+          {tendersLive && (
+            <div className="inline-flex h-[17px] w-[113px] shrink-0 items-center justify-center rounded-[5px] bg-[#5BB197] text-[10px] font-medium leading-none text-white">
+              data.gov.il · חי
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <div className={cn(tenderRowGrid, "px-3 pb-3 text-xs text-[#1E3A5F] dark:text-slate-200")}>
+            <div className="px-2">
+              <span className={tenderHeaderItalic}>פרויקט</span>
+            </div>
+            <div>
+              <span className={tenderHeaderItalic}>עיר</span>
+            </div>
+            <div>
+              <span className={tenderHeaderItalic}>מחוז</span>
+            </div>
+            <div>
+              <span className={tenderHeaderItalic}>יח״ד</span>
+            </div>
+            <div>
+              <span className={tenderHeaderItalic}>עלות פיתוח</span>
+            </div>
+            <div>
+              <span className={tenderHeaderItalic}>תאריך</span>
+            </div>
+            <div className="px-2">
+              <span className={tenderHeaderItalic}>סטטוס</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5 px-1 pb-1">
+            {recentTenders.map((t) => (
+              <div key={t.id} className={cn(tenderRowGrid, tenderRowSurface)}>
+                <div className="min-w-0 truncate px-2 font-bold text-[#1E3A5F] dark:text-slate-100">
+                  <Link
+                    href={`/tenders/${encodeURIComponent(t.id)}`}
+                    className="hover:text-[#394FD4] after:absolute after:inset-0"
+                  >
+                    {t.name}
+                  </Link>
+                </div>
+                <div className="truncate text-[#1E3A5F] dark:text-slate-200">
+                  <span className={tenderHeaderItalic}>{t.city}</span>
+                </div>
+                <div className="truncate text-[#1E3A5F] dark:text-slate-200">{t.district || "—"}</div>
+                <div className="tabular-nums text-[#1E3A5F] dark:text-slate-100">{t.units || "—"}</div>
+                <div className="tabular-nums text-[#1E3A5F] dark:text-slate-100">
+                  {t.totalDevelopCost ? formatShekelShort(t.totalDevelopCost) : "—"}
+                </div>
+                <div className="tabular-nums text-[#1E3A5F] dark:text-slate-200">{t.tenderDate || "—"}</div>
+                <div className="px-2">
+                  <span
+                    className={cn(
+                      "inline-flex h-[17px] items-center rounded-[5px] px-2 text-[10px] font-medium leading-none",
+                      t.status.includes("מכרז")
+                        ? "bg-[#D4FEEE] text-[#15803D]"
+                        : "bg-[#E3F2FF] text-[#1E3A5F] dark:bg-secondary dark:text-slate-200",
+                    )}
+                  >
+                    {t.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 text-right">
+          <Link href="/tenders" className="text-xs font-medium text-[#394FD4] hover:underline">
+            לכל המכרזים ←
+          </Link>
+        </div>
       </section>
     </div>
   );

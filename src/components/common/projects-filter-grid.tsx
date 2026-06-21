@@ -23,6 +23,39 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: "risk", label: "סיכון נמוך" },
 ];
 
+function SegmentButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+        active
+          ? "bg-[#1E3A5F] text-white"
+          : "bg-transparent text-[#5A7184] hover:text-[#1E3A5F] dark:text-slate-400 dark:hover:text-slate-200",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function FilterBar({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="shadow-pill flex flex-wrap items-center gap-1 rounded-lg bg-white p-1 dark:bg-card dark:shadow-none">
+      {children}
+    </div>
+  );
+}
+
 export function ProjectsFilterGrid({ cards }: { cards: ProjectCardData[] }) {
   const [track, setTrack] = React.useState<"all" | Track>("all");
   const [sort, setSort] = React.useState<SortKey>("score");
@@ -53,47 +86,33 @@ export function ProjectsFilterGrid({ cards }: { cards: ProjectCardData[] }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-1.5 rounded-[var(--radius-md)] bg-muted/60 p-1">
+        <FilterBar>
           {TRACK_FILTERS.map((f) => {
             const count = f.key === "all" ? cards.length : cards.filter((c) => c.track === f.key).length;
             return (
-              <button
-                key={f.key}
-                onClick={() => setTrack(f.key)}
-                className={cn(
-                  "rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium transition-colors",
-                  track === f.key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
+              <SegmentButton key={f.key} active={track === f.key} onClick={() => setTrack(f.key)}>
                 {f.label}
-                <span className="mr-1 text-[10px] opacity-60">{count}</span>
-              </button>
+                <span className="mr-1 text-[10px] opacity-70">{count}</span>
+              </SegmentButton>
             );
           })}
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        </FilterBar>
+        <div className="flex items-center gap-2 text-xs text-[#5A7184] dark:text-slate-400">
           <span>מיון:</span>
-          <div className="flex items-center gap-1.5 rounded-[var(--radius-md)] bg-muted/60 p-1">
+          <FilterBar>
             {SORTS.map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setSort(s.key)}
-                className={cn(
-                  "rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium transition-colors",
-                  sort === s.key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
+              <SegmentButton key={s.key} active={sort === s.key} onClick={() => setSort(s.key)}>
                 {s.label}
-              </button>
+              </SegmentButton>
             ))}
-          </div>
+          </FilterBar>
         </div>
       </div>
 
       {filtered.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">אין פרויקטים במסלול זה</p>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           {filtered.map((c) => (
             <ProjectCard key={c.id} p={c} />
           ))}

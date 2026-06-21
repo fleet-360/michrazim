@@ -45,6 +45,11 @@
   --chart-6: 340 75% 55%;
 
   --radius: 0.85rem;
+
+  /* Figma brand / card tokens */
+  --brand-blue: #394FD4;
+  --card-accent: #7F8FE3;
+  --card-shadow: 0 4px 4px 0 rgb(183 202 229 / 0.7); /* #B7CAE5 @ 70% */
 }
 
 .dark {
@@ -181,6 +186,11 @@ h1, h2, h3 {
 /* Figma drop shadow for dashboard status pills (Rectangle 111) */
 .shadow-pill {
   box-shadow: 4px 4px 4px 0 rgba(183, 202, 229, 0.71);
+}
+
+/* Figma drop shadow for project cards — 0 4px 4px #B7CAE5 @ 70% */
+.shadow-card {
+  box-shadow: var(--card-shadow);
 }
 
 /* Premium soft shadow for elevated surfaces */

@@ -4,13 +4,13 @@ import * as React from "react";
 import Link from "next/link";
 import {
   MapPin, Boxes, LayoutDashboard, Layers, Coins, LineChart, ShieldAlert,
-  TrendingUp, FileText, Building2, Save, Check,
+  TrendingUp, FileText, Building2, Save, Check, PlusCircle,
 } from "lucide-react";
 import { analyzeDeal } from "@/lib/engine";
 import type { DealInputs, FeeSchedule, Track } from "@/lib/engine/types";
+import type { Verdict } from "@/lib/engine";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { VerdictBadge } from "@/components/common/verdict-badge";
@@ -58,6 +58,33 @@ export interface WorkspaceProps {
     sizeSqm?: number; rooms?: number; dealDate?: string; neighborhood?: string;
   }[];
 }
+
+const TRACK_BADGE_DOT: Record<Track, string> = {
+  RMI: "bg-white",
+  URBAN_RENEWAL: "bg-white",
+  PRIVATE: "bg-white",
+};
+
+const VERDICT_PILL: Record<Verdict, string> = {
+  GO: "border-0 bg-[#D4FEEE] text-[#15803D]",
+  CONDITIONAL: "border-0 bg-[#FEF3C7] text-[hsl(var(--warning))]",
+  NO_GO: "border-0 bg-[#FEE2E2] text-danger",
+};
+
+const detailItalic =
+  "inline-block origin-right italic leading-snug [transform:skewX(-4deg)]";
+
+const workspaceIconBtn =
+  "shadow-pill size-9 shrink-0 rounded-[5px] border-0 bg-white text-[#1E3A5F] hover:bg-white/90 dark:bg-card dark:text-slate-200 dark:shadow-none";
+
+const workspaceOutlineBtn =
+  "shadow-pill h-9 gap-1.5 rounded-[5px] border-0 bg-white px-3 text-xs font-medium text-[#1E3A5F] hover:bg-white/90 dark:bg-card dark:text-slate-200 dark:shadow-none";
+
+const workspacePrimaryBtn =
+  "shadow-pill h-9 gap-1.5 rounded-[5px] bg-[#1E3A5F] px-3 text-xs font-medium text-white hover:bg-[#1E3A5F]/90 dark:shadow-none";
+
+const workspacePanel =
+  "workspace-panel-bg shadow-card rounded-[5px] p-6 dark:shadow-none";
 
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = React.useState(value);
@@ -220,38 +247,59 @@ export function ProjectWorkspace(props: WorkspaceProps) {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="gap-1">
-              <span className="size-1.5 rounded-full" style={{ background: track.color }} />
+        <div className="space-y-2 text-right">
+          <div className="flex items-center justify-start gap-2">
+            <span
+              className="shadow-pill inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium text-white dark:shadow-none"
+              style={{ background: track.color }}
+            >
+              <span className={cn("size-1.5 shrink-0 rounded-full", TRACK_BADGE_DOT[props.track])} />
               {track.label}
-            </Badge>
-            <VerdictBadge verdict={analysis.verdict} />
+            </span>
+            <VerdictBadge
+              verdict={analysis.verdict}
+              className={cn(
+                "shadow-pill shrink-0 rounded-full border-0 px-2.5 dark:shadow-none",
+                VERDICT_PILL[analysis.verdict],
+              )}
+            />
           </div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">{props.name}</h1>
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <MapPin className="size-4" />
-            {props.address || props.city}
-            {props.inputs.rights && (
-              <>
-                <span className="mx-1">·</span>
-                {formatNumber(props.plotAreaSqm)} מ״ר · {det.rights.units} יח״ד
-              </>
-            )}
+          <h1 className="text-lg font-bold leading-snug text-[#1E3A5F] dark:text-slate-100">{props.name}</h1>
+          <div className="flex items-center justify-start gap-1.5 text-sm text-[#1E3A5F] dark:text-slate-200">
+            <MapPin className="size-3.5 shrink-0" />
+            <span className={detailItalic}>
+              {props.address || props.city}
+              {props.inputs.rights && (
+                <>
+                  {" · "}
+                  {formatNumber(props.plotAreaSqm)} מ״ר · {det.rights.units} יח״ד
+                </>
+              )}
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <DeleteProject id={props.id} name={props.name} />
-          <Button variant="outline" size="icon" aria-label="ייצוא ל-Excel" onClick={exportXlsx} className="text-muted-foreground hover:text-success">
+          <DeleteProject
+            id={props.id}
+            name={props.name}
+            triggerClassName={cn(workspaceIconBtn, "hover:text-danger")}
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="ייצוא ל-Excel"
+            onClick={exportXlsx}
+            className={workspaceIconBtn}
+          >
             <FileSpreadsheet className="size-4" />
           </Button>
-          <Button variant="outline" className="gap-2" onClick={save} disabled={saving}>
+          <Button variant="outline" className={workspaceOutlineBtn} onClick={save} disabled={saving}>
             {saved ? <Check className="size-4 text-success" /> : <Save className="size-4" />}
             שמירה
           </Button>
-          <Button asChild className="gap-2">
+          <Button asChild className={workspacePrimaryBtn}>
             <Link href={`/projects/${props.id}/report`}>
-              <FileText className="size-4" />
+              <PlusCircle className="size-4" />
               דוח החלטה
             </Link>
           </Button>
@@ -259,50 +307,65 @@ export function ProjectWorkspace(props: WorkspaceProps) {
       </div>
 
       {/* Live bid control bar */}
-      <Card className="overflow-hidden border-primary/20">
-        <div className="grid gap-5 p-5 lg:grid-cols-[1.4fr_1fr]">
-          <div className="space-y-4">
-            <div className="flex items-end justify-between">
-              <div>
-                <div className="text-xs font-medium text-muted-foreground">מחיר ההצעה למכרז</div>
-                <div className="font-display text-3xl font-bold tnum">{formatShekelShort(bid)}</div>
+      <div className={workspacePanel}>
+        <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+          <div className="space-y-5">
+            <div className="flex items-end justify-between gap-4">
+              <div className="text-right">
+                <div className={cn("text-xs text-[#5A7184] dark:text-slate-400", detailItalic)}>
+                  מחיר ההצעה למכרז
+                </div>
+                <div className="mt-1 text-2xl font-bold leading-none tnum text-[#1E3A5F] dark:text-slate-100">
+                  {formatShekelShort(bid)}
+                </div>
               </div>
-              <div className="text-left text-xs text-muted-foreground">
-                שווי קרקע שיורי
+              <div className="text-left">
+                <div className={cn("text-xs text-[#5A7184] dark:text-slate-400", detailItalic)}>שווי קרקע שיורי</div>
                 <AnimatedNumber
                   value={det.maxLandValue}
                   format={formatShekelShort}
-                  className="block font-display text-base font-bold text-primary"
+                  className="mt-1 block text-base font-bold leading-none tnum text-[#394FD4]"
                 />
               </div>
             </div>
             <Slider
+              variant="brand"
               value={[bid]}
               min={0}
               max={bidMax}
               step={Math.max(50000, Math.round(bidMax / 200))}
               onValueChange={(v) => setBid(v[0])}
             />
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>רמת סיכון</span>
-              <div className="flex items-center gap-3">
-                <span>שמרני</span>
-                <div className="w-32">
-                  <Slider value={[risk]} min={0} max={1} step={0.05} onValueChange={(v) => setRisk(v[0])} />
+            <div className="flex items-center justify-between gap-3 text-xs text-[#5A7184] dark:text-slate-400">
+              <span className={detailItalic}>רמת סיכון</span>
+              <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+                <span className={detailItalic}>שמרני</span>
+                <div className="w-full max-w-[180px]">
+                  <Slider
+                    variant="brand"
+                    value={[risk]}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    onValueChange={(v) => setRisk(v[0])}
+                  />
                 </div>
-                <span>אגרסיבי</span>
+                <span className={detailItalic}>אגרסיבי</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 rounded-[var(--radius-md)] bg-muted/50 p-1">
+            <div className="shadow-pill flex items-center gap-1 rounded-[5px] bg-white p-1 dark:bg-card dark:shadow-none">
               {(Object.keys(SCENARIO_META) as ScenarioKey[]).map((k) => (
                 <button
                   key={k}
+                  type="button"
                   onClick={() => setScenario(k)}
                   title={SCENARIO_META[k].desc}
                   className={cn(
-                    "flex-1 rounded-[var(--radius-sm)] px-2 py-1.5 text-xs font-medium transition-colors",
-                    scenario === k ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                    "flex-1 rounded-[5px] px-2 py-1.5 text-xs font-medium transition-colors",
+                    scenario === k
+                      ? "workspace-scenario-active shadow-none"
+                      : "bg-transparent text-[#5A7184] hover:text-[#1E3A5F] dark:text-slate-400 dark:hover:text-slate-200",
                   )}
                 >
                   {SCENARIO_META[k].label}
@@ -312,13 +375,33 @@ export function ProjectWorkspace(props: WorkspaceProps) {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <LiveStat label="מרווח על העלות" animate={ev.marginOnCost} format={(v) => formatPct(v)} tone={ev.marginOnCost < inputs.requiredProfitMarginOnCost ? "warn" : "good"} />
-            <LiveStat label="IRR" animate={ev.irr} format={(v) => formatPct(v)} tone={ev.irr < 0.12 ? "warn" : "good"} />
-            <LiveStat label="הסתברות הפסד" animate={mc.probabilityOfLoss} format={(v) => formatPct(v)} tone={mc.probabilityOfLoss > 0.15 ? "bad" : "good"} />
-            <LiveStat label="רווח חזוי (P50)" animate={mc.profit.p50} format={formatShekelShort} tone={mc.profit.p50 > 0 ? "good" : "bad"} />
+            <SummaryKpi
+              label="מרווח על העלות"
+              animate={ev.marginOnCost}
+              format={(v) => formatPct(v)}
+              tone={ev.marginOnCost < inputs.requiredProfitMarginOnCost ? "warn" : "good"}
+            />
+            <SummaryKpi
+              label="IRR"
+              animate={ev.irr}
+              format={(v) => formatPct(v)}
+              tone={ev.irr < 0.12 ? "warn" : "good"}
+            />
+            <SummaryKpi
+              label="הסתברות הפסד"
+              animate={mc.probabilityOfLoss}
+              format={(v) => formatPct(v)}
+              tone={mc.probabilityOfLoss > 0.15 ? "bad" : "good"}
+            />
+            <SummaryKpi
+              label="רווח חזוי (P50)"
+              animate={mc.profit.p50}
+              format={formatShekelShort}
+              tone={mc.profit.p50 > 0 ? "good" : "bad"}
+            />
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Tabs */}
       <Tabs defaultValue="map">
@@ -571,6 +654,36 @@ export function ProjectWorkspace(props: WorkspaceProps) {
           </div>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function SummaryKpi({
+  label,
+  value,
+  animate,
+  format,
+  tone = "neutral",
+}: {
+  label: string;
+  value?: string;
+  animate?: number;
+  format?: (v: number) => string;
+  tone?: "good" | "bad" | "warn" | "neutral";
+}) {
+  const toneCls = {
+    good: "text-[#15803D]",
+    bad: "text-danger",
+    warn: "text-[hsl(var(--warning))]",
+    neutral: "text-[#1E3A5F] dark:text-slate-100",
+  }[tone];
+
+  return (
+    <div className="shadow-card rounded-[5px] bg-white p-3 text-right dark:bg-card dark:shadow-none">
+      <div className={cn("text-xs text-[#1E3A5F] dark:text-slate-200", detailItalic)}>{label}</div>
+      <div className={cn("mt-1 text-lg font-bold leading-none tnum", toneCls)}>
+        {animate !== undefined && format ? <AnimatedNumber value={animate} format={format} /> : value}
+      </div>
     </div>
   );
 }

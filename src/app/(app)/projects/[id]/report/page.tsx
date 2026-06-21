@@ -46,9 +46,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         {/* Letterhead */}
         <div className="flex items-start justify-between border-b border-border pb-5">
           <div className="flex items-center gap-3">
-            <LogoMark className="size-10" />
-            <div>
-              <div className="font-display text-xl font-extrabold">רדיוס</div>
+            <LogoMark className="h-9 w-auto" />
+            <div className="border-r border-border pr-3">
               <div className="text-xs text-muted-foreground">דוח חיתום והערכת מכרז</div>
             </div>
           </div>

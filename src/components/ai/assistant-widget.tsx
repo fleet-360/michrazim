@@ -4,7 +4,7 @@ import * as React from "react";
 import { X, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogoMark } from "@/components/brand/logo";
+import { LogoIcon } from "@/components/brand/logo";
 import { AiMarkdown } from "./ai-markdown";
 import { askAssistantAction } from "@/server/actions";
 import { cn } from "@/lib/utils";
@@ -51,7 +51,7 @@ export function AssistantWidget() {
         )}
         aria-label="עוזר חכם — שאל את רדיוס"
       >
-        <LogoMark className="size-6" />
+        <LogoIcon className="size-6" />
         <span className="hidden text-sm font-semibold sm:inline">שאל את רדיוס</span>
       </button>
 
@@ -64,9 +64,7 @@ export function AssistantWidget() {
       >
         <div className="flex items-center justify-between border-b border-border bg-gradient-to-l from-primary/10 to-transparent p-4">
           <div className="flex items-center gap-2">
-            <div className="grid size-8 place-items-center rounded-lg bg-primary/10">
-              <LogoMark className="size-5" />
-            </div>
+            <LogoIcon className="size-8" />
             <div>
               <div className="font-display text-sm font-semibold">העוזר החכם של רדיוס</div>
               <div className="text-xs text-muted-foreground">מסביר חישובים ומושגים</div>

@@ -245,6 +245,26 @@ h1, h2, h3 {
   animation: shimmer 1.6s infinite;
 }
 
+/* Indeterminate progress sweep — the bar bounces edge-to-edge inside its track.
+   `transform-box: view-box` keeps the translation in SVG user units. */
+@keyframes loader-sweep {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(614px);
+  }
+}
+.loader-sweep {
+  transform-box: view-box;
+  animation: loader-sweep 1.25s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .loader-sweep {
+    animation: none;
+  }
+}
+
 @media print {
   .no-print {
     display: none !important;

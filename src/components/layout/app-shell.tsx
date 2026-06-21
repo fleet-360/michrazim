@@ -3,9 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plus, LogOut, Search } from "lucide-react";
+import { Plus, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/logo";
+import { SearchIcon } from "@/components/brand/search-icon";
 import {
   IconDashboard, IconTender, IconCompare, IconMap, IconMarket, IconFees, IconIntegrations, IconNew,
 } from "@/components/brand/icons";
@@ -125,21 +126,22 @@ export function AppShell({
 
         {/* Main */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border bg-background/70 px-5 backdrop-blur-xl">
+          <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 bg-white px-5 dark:bg-background">
             <div className="flex items-center gap-2 lg:hidden">
               <Logo />
             </div>
             <button
               onClick={openCommand}
-              className="hidden min-w-72 items-center gap-2 rounded-[var(--radius-md)] border border-border bg-card/60 px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground lg:flex"
+              className="hidden h-[29px] w-[402px] max-w-full shrink-0 items-center gap-2 rounded-[5px] bg-[#E3F2FF] px-3 transition-colors hover:bg-[#E3F2FF]/80 lg:flex dark:bg-[#15233a] dark:hover:bg-[#15233a]/90"
             >
-              <Search className="size-4" />
-              <span className="flex-1 text-right">חיפוש פרויקטים, ניווט, פעולות…</span>
-              <kbd className="rounded bg-muted px-1.5 py-0.5 text-[10px]">⌘K</kbd>
+              <SearchIcon className="text-black dark:text-white" />
+              <span className="inline-block flex-1 origin-right text-right text-xs font-normal italic leading-none text-[#1E3A5F] [transform:skewX(-4deg)] dark:text-slate-200">
+                חיפוש פרויקטים, ניווט, פעולות…
+              </span>
             </button>
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" className="lg:hidden" aria-label="חיפוש" onClick={openCommand}>
-                <Search className="size-4" />
+                <SearchIcon className="text-foreground" />
               </Button>
               <ThemeToggle />
               {user ? (
@@ -157,7 +159,7 @@ export function AppShell({
             </div>
           </header>
 
-          <main className="flex-1 px-4 pb-28 pt-6 sm:px-5">{children}</main>
+          <main className="flex-1 bg-white px-4 pb-28 pt-6 sm:px-5 dark:bg-background">{children}</main>
         </div>
       </div>
 

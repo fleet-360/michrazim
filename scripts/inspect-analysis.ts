@@ -5,7 +5,7 @@ import { SEED_CITIES, SEED_PROJECTS } from "../src/server/seed-data";
 const m = (n: number) => (n / 1e6).toFixed(1) + "M";
 
 for (const p of SEED_PROJECTS) {
-  const schedule = feeScheduleFor(p.city, SEED_CITIES as any);
+  const schedule = feeScheduleFor(p.city, SEED_CITIES);
   const a = analyzeDeal(p.inputs, schedule, {
     bid: p.bid,
     marketAnchor: p.marketAnchor,

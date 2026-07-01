@@ -8,7 +8,7 @@ async function checkCkan() {
       'https://data.gov.il/api/3/action/package_search?q=' + encodeURIComponent('עסקאות נדל"ן') + "&rows=3",
       { signal: AbortSignal.timeout(8000) },
     );
-    const j: any = await r.json();
+    const j = (await r.json()) as { success?: boolean; result?: { results?: { title?: string }[] } };
     console.log(`CKAN live: ${j?.success ? "✅" : "❌"} — ${j?.result?.results?.length ?? 0} datasets`);
     if (j?.result?.results?.[0]) console.log("  דוגמה:", j.result.results[0].title);
   } catch (e) {
@@ -25,7 +25,7 @@ async function checkAnthropic() {
       max_tokens: 60,
       messages: [{ role: "user", content: "ענה במילה אחת: שלום" }],
     });
-    const text = msg.content.find((b: any) => b.type === "text") as any;
+    const text = msg.content.find((b): b is Anthropic.TextBlock => b.type === "text");
     console.log("Anthropic: ✅ —", text?.text?.trim(), "| model:", msg.model);
   } catch (e) {
     console.log("Anthropic: ❌", (e as Error).message);

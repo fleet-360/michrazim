@@ -114,8 +114,8 @@ function useSimulatedProgress() {
   const [progress, setProgress] = useState(0.05);
   useEffect(() => {
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      setProgress(1);
-      return;
+      const raf = requestAnimationFrame(() => setProgress(1));
+      return () => cancelAnimationFrame(raf);
     }
     let raf = 0;
     let p = 0.05;

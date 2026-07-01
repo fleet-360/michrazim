@@ -1,5 +1,22 @@
 # Radius (רדיוס) — Production Master Plan
 
+> **Implementation status (2026-07):** Part 0 is DONE (IDOR fixes, strict AUTH_SECRET,
+> zod validation on all actions, AI rate limiting, prompt-injection hardening, DB
+> indexes, `.env.example`, CI pipeline, `/api/health`). From Part C: correlated
+> Monte Carlo (Gaussian copula), CPI indexation, VAT support (engine capability;
+> template default documented in `src/lib/templates.ts`), and live presales are
+> DONE with tests. From Part A: lazy recharts, error boundaries, first-run
+> onboarding are DONE (the bid command bar shipped earlier via the Figma redesign).
+> From Part B: the Win Curve (B.1), the opportunity screener (B.4), and deal-room
+> share links (B.5) are DONE. Still open: Radar alerts (B.3), calibration loop
+> (B.2), AI committee (B.6), org-level multi-tenancy (C.5), server-side adapter
+> cache (C.3), web-worker Monte Carlo (C.4), server-action integration tests
+> (blocked locally: the sandbox network policy denies fastdl.mongodb.org, so
+> mongodb-memory-server cannot run here — run e2e/integration in CI with a
+> mongo service container), urban-renewal template recalibration (pre-existing:
+> deeply negative at average anchors), and the ממ"ד sellable-area convention
+> (prerequisite to flipping VAT netting on by default).
+
 **Deep-dive analysis, 2026-07.** Four parallel audits were run across the codebase: underwriting engine + data adapters, server/security, frontend/UX, and ops/deployment. This document is the synthesized, prioritized master plan. Every claim is grounded in a `file:line` reference.
 
 **Verdict in one paragraph:** Radius is a genuinely strong product core — the closed-form RLV solution to the land-carry circularity (`src/lib/engine/financing.ts:31-48`), the fallback chains on every gov-data adapter, and the RTL implementation are all top-tier. But it is **not production-safe today**: there are confirmed IDOR vulnerabilities letting any authenticated user delete or mutate any other user's projects and shared city data, a hardcoded fallback JWT secret, zero rate limiting on paid AI calls, no CI, and no observability. Separately, the Monte Carlo engine's statistically independent sampling systematically **understates risk** — the one thing the product promises to measure. Fix Part 0 before any public deploy; Part C makes the math honest; Parts A/B make it a product people evangelize.

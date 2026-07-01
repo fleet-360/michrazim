@@ -17,11 +17,13 @@ import { VerdictBadge } from "@/components/common/verdict-badge";
 import { TRACK_META } from "@/lib/verdict";
 import { DynamicMap } from "@/components/map/dynamic-map";
 import { FLOOR_H, COVERAGE } from "@/components/map/geo";
-import { ProfitDistribution } from "@/components/charts/profit-distribution";
-import { CostWaterfall } from "@/components/charts/cost-waterfall";
+import {
+  LazyProfitDistribution as ProfitDistribution,
+  LazyCostWaterfall as CostWaterfall,
+  LazyCashflowChart as CashflowChart,
+} from "@/components/charts/lazy";
 import { BidGauge } from "@/components/charts/bid-gauge";
 import { DealScore } from "@/components/charts/deal-score";
-import { CashflowChart } from "@/components/charts/cashflow-chart";
 import { TornadoChart } from "@/components/charts/tornado-chart";
 import { AiPanel } from "@/components/ai/ai-panel";
 import { ComparablesTable } from "@/components/project/comparables-table";

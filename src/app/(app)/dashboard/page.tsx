@@ -70,6 +70,10 @@ export default async function DashboardPage() {
   const avgLoss = cards.length ? cards.reduce((s, c) => s + c.probabilityOfLoss, 0) / cards.length : 0;
   const openTenders = rmiTotals.inTender;
 
+  // First-run: zero projects means the KPI cards are all zeros — replace the
+  // dead aquarium with a single guided action through the happiest path.
+  const isFirstRun = cards.length === 0;
+
   return (
     <div className="space-y-7">
       <div className="space-y-6 rounded-[var(--radius-lg)] bg-[#E3F2FF] p-6 shadow-[0_4px_14px_-2px_rgba(183,202,229,0.7)] dark:bg-[#15233a] dark:shadow-none">
@@ -83,6 +87,34 @@ export default async function DashboardPage() {
           <DataSourcePills status={status} />
         </div>
 
+        {isFirstRun && (
+          <div className="rounded-[var(--radius-md)] bg-white p-6 text-right shadow-card dark:bg-card dark:shadow-none">
+            <h2 className="text-base font-bold text-[#1E3A5F] dark:text-slate-100">
+              תוך דקה מהמכרז הראשון להכרעה
+            </h2>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <FirstRunStep n={1} title="בחרו מכרז חי" desc={`יש כרגע ${formatNumber(openTenders)} מכרזי רמ״י פתוחים — בחרו אחד מהרשימה למטה או מהקטלוג`} />
+              <FirstRunStep n={2} title="ייבאו כפרויקט" desc="לחיצה אחת על ״ייבוא כפרויקט״ במכרז — אנחנו ממלאים את כל ההנחות" />
+              <FirstRunStep n={3} title="קבלו הכרעה" desc="שווי קרקע שיורי, אלפי תרחישים, מחיר הצעה מומלץ ודוח החלטה" />
+            </div>
+            <div className="mt-5 flex flex-wrap items-center justify-start gap-2">
+              <Link
+                href="/tenders"
+                className="inline-flex h-9 items-center gap-1.5 rounded-[5px] bg-[#1E3A5F] px-4 text-xs font-medium text-white hover:bg-[#1E3A5F]/90"
+              >
+                לקטלוג המכרזים ←
+              </Link>
+              <Link
+                href="/projects/new"
+                className="shadow-pill inline-flex h-9 items-center gap-1.5 rounded-[5px] bg-white px-4 text-xs font-medium text-[#1E3A5F] hover:bg-white/90 dark:bg-secondary dark:text-slate-200 dark:shadow-none"
+              >
+                או צרו עסקה ידנית
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {!isFirstRun && (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
             label="סך שווי קרקע שיורי"
@@ -113,12 +145,15 @@ export default async function DashboardPage() {
             accent="warning"
           />
         </div>
+        )}
       </div>
 
+      {!isFirstRun && (
       <section className="space-y-4 rounded-[var(--radius-lg)] bg-[#E3F2FF] p-6 dark:bg-[#15233a]">
         <h2 className="text-right text-base font-bold text-[#1E3A5F] dark:text-slate-100">הפרויקטים שלי</h2>
         <ProjectsFilterGrid cards={cards} />
       </section>
+      )}
 
       <section className="shadow-card min-h-[386px] rounded-[5px] bg-[#E3F2FF] p-6 dark:bg-[#15233a] dark:shadow-none">
         <div className="flex items-center justify-between gap-4">
@@ -201,6 +236,20 @@ export default async function DashboardPage() {
           </Link>
         </div>
       </section>
+    </div>
+  );
+}
+
+function FirstRunStep({ n, title, desc }: { n: number; title: string; desc: string }) {
+  return (
+    <div className="rounded-[var(--radius-md)] bg-[#E3F2FF] p-4 dark:bg-secondary/40">
+      <div className="flex items-center justify-start gap-2">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#1E3A5F] text-xs font-bold text-white">
+          {n}
+        </span>
+        <span className="text-sm font-bold text-[#1E3A5F] dark:text-slate-100">{title}</span>
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-[#5A7184] dark:text-slate-400">{desc}</p>
     </div>
   );
 }

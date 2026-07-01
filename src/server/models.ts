@@ -54,7 +54,7 @@ const CitySchema = new Schema(
 // --------------------------------------------------------------------------
 const ComparableSchema = new Schema(
   {
-    city: String,
+    city: { type: String, index: true },
     neighborhood: String,
     address: String,
     lat: Number,
@@ -122,7 +122,7 @@ const ProjectSchema = new Schema(
     bid: Number,
     riskAppetite: { type: Number, default: 0.4 },
     inputs: { type: Schema.Types.Mixed, required: true },
-    createdBy: { type: Schema.Types.ObjectId, ref: "User" },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User", index: true },
     orgId: { type: Schema.Types.ObjectId, ref: "Organization" },
     coverImage: String,
   },

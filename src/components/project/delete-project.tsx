@@ -24,7 +24,13 @@ export function DeleteProject({
 
   async function del() {
     setLoading(true);
-    await deleteProjectAction(id);
+    const res = await deleteProjectAction(id);
+    if (res && "error" in res && res.error) {
+      setLoading(false);
+      setOpen(false);
+      toast.error(res.error);
+      return;
+    }
     toast.success("הפרויקט נמחק");
     router.push("/dashboard");
   }

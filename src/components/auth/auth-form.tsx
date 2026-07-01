@@ -79,7 +79,7 @@ function RegisterPanel({ next, onDone }: { next?: string; onDone: () => void }) 
   const [v, setV] = React.useState({ name: "", email: "", password: "", company: "", title: ROLES[0] });
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setV({ ...v, [k]: e.target.value });
 
-  const canAdvance = v.name.trim() && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email) && v.password.length >= 6;
+  const canAdvance = v.name.trim() && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email) && v.password.length >= 8;
 
   return (
     <form action={formAction} className="space-y-4">
@@ -103,7 +103,7 @@ function RegisterPanel({ next, onDone }: { next?: string; onDone: () => void }) 
         </div>
         <div className="space-y-2">
           <Label htmlFor="r-password">סיסמה</Label>
-          <Input id="r-password" name="password" type="password" dir="ltr" className="text-right" value={v.password} onChange={set("password")} placeholder="לפחות 6 תווים" required />
+          <Input id="r-password" name="password" type="password" dir="ltr" className="text-right" value={v.password} onChange={set("password")} placeholder="לפחות 8 תווים" minLength={8} required />
         </div>
         <Button type="button" size="lg" className="w-full gap-2" disabled={!canAdvance} onClick={() => setStep(2)}>
           המשך

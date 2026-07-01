@@ -55,8 +55,12 @@ export function ComparablesTable({
 
   async function del(id: string) {
     setDeleting(id);
-    await deleteComparableAction(id);
+    const res = await deleteComparableAction(id);
     setDeleting(null);
+    if (res && "error" in res && res.error) {
+      toast.error(res.error);
+      return;
+    }
     toast.success("העסקה נמחקה");
     router.refresh();
   }

@@ -48,8 +48,12 @@ export function EditableFeesTable({ cities }: { cities: CityRow[] }) {
 
   async function save(c: CityRow) {
     setSaving(c._id);
-    await updateCityFeesAction(c._id, edits[c._id] || {});
+    const res = await updateCityFeesAction(c._id, edits[c._id] || {});
     setSaving(null);
+    if (res && "error" in res && res.error) {
+      toast.error(res.error);
+      return;
+    }
     setSavedId(c._id);
     setEdits((e) => { const n = { ...e }; delete n[c._id]; return n; });
     toast.success(`התעריפים של ${c.name} עודכנו`);

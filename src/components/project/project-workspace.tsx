@@ -162,8 +162,12 @@ export function ProjectWorkspace(props: WorkspaceProps) {
 
   async function save() {
     setSaving(true);
-    await updateProjectBid(props.id, bid, risk);
+    const res = await updateProjectBid(props.id, bid, risk);
     setSaving(false);
+    if (res && "error" in res && res.error) {
+      toast.error(res.error);
+      return;
+    }
     setSaved(true);
     toast.success("ההצעה נשמרה");
     setTimeout(() => setSaved(false), 2000);

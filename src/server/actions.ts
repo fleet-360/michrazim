@@ -11,10 +11,54 @@ import { analyzeProject } from "./analysis";
 import { riskAnalysis, answerQuestion, decisionReport, parseTenderText, methodologyAssistant, parseDealsText, type ProjectMeta } from "@/lib/ai/insights";
 import { derivePlotForUnits } from "@/lib/import-derive";
 import type { DealInputs, Track } from "@/lib/engine/types";
+import { consumeRateLimit, AI_RATE_LIMIT } from "./rate-limit";
+import {
+  registerSchema,
+  tenderIdSchema,
+  bidUpdateSchema,
+  questionSchema,
+  assistantHistorySchema,
+  importDealsSchema,
+  parseTenderSchema,
+  cityFeesPatchSchema,
+  newProjectSchema,
+  importTenderSchema,
+  importRenewalSchema,
+  objectIdSchema,
+} from "./validation";
 
 /** Only allow same-origin relative redirects (guard against open-redirect). */
 function safeNext(next: string): string {
   return next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+}
+
+/**
+ * Ownership filter for project mutations: a project may be mutated only by its
+ * owner. Legacy/seeded projects without an owner stay mutable by any signed-in
+ * user — mirroring the read semantics in getProjectById.
+ */
+function ownedBy(sessionId: string) {
+  return { $or: [{ createdBy: sessionId }, { createdBy: { $exists: false } }] };
+}
+
+/**
+ * Shared gate for every AI-backed action: AI calls bill real money, so they
+ * require a signed-in user and are rate-limited per user.
+ */
+async function aiGate(): Promise<{ error: string } | { session: { id: string } }> {
+  const session = await getSession();
+  if (!session) return { error: "נדרשת התחברות כדי להשתמש ביכולות ה-AI" };
+  const rl = await consumeRateLimit(`ai:${session.id}`, AI_RATE_LIMIT);
+  if (!rl.ok) return { error: "חרגתם ממכסת בקשות ה-AI לשעה — נסו שוב מאוחר יותר" };
+  return { session };
+}
+
+/** Gate for mutations of shared reference data (fees, comparables). */
+async function requireAdmin(): Promise<{ error: string } | { session: { id: string } }> {
+  const session = await getSession();
+  if (!session) return { error: "נדרשת התחברות" };
+  if (session.role !== "admin") return { error: "פעולה זו דורשת הרשאת מנהל — היא משנה נתונים משותפים לכל המשתמשים" };
+  return { session };
 }
 
 export async function loginAction(_prev: unknown, formData: FormData) {
@@ -29,15 +73,21 @@ export async function loginAction(_prev: unknown, formData: FormData) {
 
 /** Self-service registration (email + password) with onboarding profile fields. */
 export async function registerAction(_prev: unknown, formData: FormData) {
-  const email = String(formData.get("email") || "").toLowerCase().trim();
-  const password = String(formData.get("password") || "");
-  const name = String(formData.get("name") || "").trim();
-  const company = String(formData.get("company") || "").trim();
-  const title = String(formData.get("title") || "").trim();
   const next = String(formData.get("next") || "");
-  if (!email || !password || !name) return { error: "נא למלא אימייל, שם וסיסמה" };
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "כתובת אימייל לא תקינה" };
-  if (password.length < 6) return { error: "הסיסמה חייבת להכיל לפחות 6 תווים" };
+  const parsed = registerSchema.safeParse({
+    email: String(formData.get("email") || ""),
+    password: String(formData.get("password") || ""),
+    name: String(formData.get("name") || ""),
+    company: String(formData.get("company") || ""),
+    title: String(formData.get("title") || ""),
+  });
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    if (issue?.path[0] === "password") return { error: "הסיסמה חייבת להכיל לפחות 8 תווים" };
+    if (issue?.path[0] === "email") return { error: "כתובת אימייל לא תקינה" };
+    return { error: "נא למלא אימייל, שם וסיסמה תקינים" };
+  }
+  const { email, password, name, company, title } = parsed.data;
   try {
     await connectDB();
     const existing = await User.findOne({ email }).lean();
@@ -63,6 +113,7 @@ export async function toggleWatchAction(
 ): Promise<{ watching: boolean } | { requireAuth: true }> {
   const session = await getSession();
   if (!session) return { requireAuth: true };
+  if (!tenderIdSchema.safeParse(tenderId).success) return { requireAuth: true };
   await connectDB();
   const user = await User.findById(session.id).select("watchlist");
   if (!user) return { requireAuth: true };
@@ -109,13 +160,23 @@ async function loadMetaAndAnalysis(id: string, opts?: { bid?: number; riskAppeti
 }
 
 export async function updateProjectBid(id: string, bid: number, riskAppetite: number) {
+  const session = await getSession();
+  if (!session) return { error: "נדרשת התחברות כדי לשמור" };
+  const parsed = bidUpdateSchema.safeParse({ id, bid, riskAppetite });
+  if (!parsed.success) return { error: "קלט לא תקין" };
   await connectDB();
-  await Project.findByIdAndUpdate(id, { bid, riskAppetite });
+  const updated = await Project.findOneAndUpdate(
+    { _id: parsed.data.id, ...ownedBy(session.id) },
+    { bid: parsed.data.bid, riskAppetite: parsed.data.riskAppetite },
+  );
+  if (!updated) return { error: "הפרויקט לא נמצא או שאינו שלכם" };
   revalidatePath(`/projects/${id}`);
   return { ok: true };
 }
 
 export async function generateRiskInsight(id: string) {
+  const gate = await aiGate();
+  if ("error" in gate) return gate;
   const loaded = await loadMetaAndAnalysis(id);
   if (!loaded) return { error: "פרויקט לא נמצא" };
   const content = await riskAnalysis(loaded.meta, loaded.analysis);
@@ -126,6 +187,8 @@ export async function generateRiskInsight(id: string) {
 }
 
 export async function generateReportInsight(id: string) {
+  const gate = await aiGate();
+  if ("error" in gate) return gate;
   const loaded = await loadMetaAndAnalysis(id);
   if (!loaded) return { error: "פרויקט לא נמצא" };
   const content = await decisionReport(loaded.meta, loaded.analysis);
@@ -136,23 +199,34 @@ export async function generateReportInsight(id: string) {
 }
 
 export async function askProjectQuestion(id: string, question: string) {
+  const gate = await aiGate();
+  if ("error" in gate) return gate;
+  const q = questionSchema.safeParse(question);
+  if (!q.success) return { error: "שאלה ריקה או ארוכה מדי" };
   const loaded = await loadMetaAndAnalysis(id);
   if (!loaded) return { error: "פרויקט לא נמצא" };
-  const content = await answerQuestion(loaded.meta, loaded.analysis, question);
+  const content = await answerQuestion(loaded.meta, loaded.analysis, q.data);
   if (!content) return { error: "שירות ה-AI אינו זמין כרגע" };
   return { content };
 }
 
 export async function parseTenderAction(text: string) {
-  const parsed = await parseTenderText(text);
+  const gate = await aiGate();
+  if ("error" in gate) return gate;
+  const t = parseTenderSchema.safeParse(text);
+  if (!t.success) return { error: "טקסט ריק או ארוך מדי (עד 20,000 תווים)" };
+  const parsed = await parseTenderText(t.data);
   if (!parsed) return { error: "לא הצלחתי לחלץ נתונים מהטקסט" };
   return { parsed };
 }
 
 export async function importDealsAction(text: string, city: string) {
   if (!(await getSession())) return { requireAuth: true as const };
-  if (!text.trim() || !city) return { error: "נא לבחור עיר ולהדביק נתונים" };
-  const deals = await parseDealsText(text, city);
+  const parsedInput = importDealsSchema.safeParse({ text, city });
+  if (!parsedInput.success) return { error: "נא לבחור עיר ולהדביק נתונים (עד 50,000 תווים)" };
+  const gate = await aiGate();
+  if ("error" in gate) return gate;
+  const deals = await parseDealsText(parsedInput.data.text, parsedInput.data.city);
   if (!deals || deals.length === 0) return { error: "לא הצלחתי לזהות עסקאות בטקסט" };
   await connectDB();
   const geo = geocodeCity(city);
@@ -196,6 +270,9 @@ export async function importDealsAction(text: string, city: string) {
 }
 
 export async function deleteComparableAction(id: string) {
+  const gate = await requireAdmin();
+  if ("error" in gate) return gate;
+  if (!objectIdSchema.safeParse(id).success) return { error: "מזהה לא תקין" };
   await connectDB();
   await Comparable.findByIdAndDelete(id);
   revalidatePath("/comparables");
@@ -203,8 +280,10 @@ export async function deleteComparableAction(id: string) {
 }
 
 export async function clearCityComparablesAction(city: string) {
+  const gate = await requireAdmin();
+  if ("error" in gate) return gate;
   await connectDB();
-  const res = await Comparable.deleteMany({ city });
+  const res = await Comparable.deleteMany({ city: String(city).slice(0, 100) });
   revalidatePath("/comparables");
   return { ok: true, deleted: res.deletedCount ?? 0 };
 }
@@ -220,8 +299,13 @@ export interface CityFeesPatch {
 }
 
 export async function updateCityFeesAction(cityId: string, fees: CityFeesPatch) {
+  const gate = await requireAdmin();
+  if ("error" in gate) return gate;
+  if (!objectIdSchema.safeParse(cityId).success) return { error: "מזהה עיר לא תקין" };
+  const parsed = cityFeesPatchSchema.safeParse(fees);
+  if (!parsed.success) return { error: "ערכי תעריפים לא תקינים" };
   await connectDB();
-  await City.findByIdAndUpdate(cityId, fees);
+  await City.findByIdAndUpdate(cityId, parsed.data);
   revalidatePath("/data/cities");
   return { ok: true };
 }
@@ -230,7 +314,12 @@ export async function askAssistantAction(
   question: string,
   history: { role: "user" | "assistant"; content: string }[] = [],
 ) {
-  const content = await methodologyAssistant(question, history);
+  const gate = await aiGate();
+  if ("error" in gate) return gate;
+  const q = questionSchema.safeParse(question);
+  if (!q.success) return { error: "שאלה ריקה או ארוכה מדי" };
+  const h = assistantHistorySchema.safeParse(history);
+  const content = await methodologyAssistant(q.data, h.success ? h.data : []);
   if (!content) return { error: "שירות ה-AI אינו זמין כרגע" };
   return { content };
 }
@@ -251,30 +340,36 @@ export interface NewProjectInput {
 export async function createProjectAction(data: NewProjectInput) {
   const session = await getSession();
   if (!session) return { requireAuth: true as const };
+  const valid = newProjectSchema.safeParse(data);
+  if (!valid.success) return { error: "נתוני הפרויקט אינם תקינים — בדקו את השדות ונסו שוב" };
   await connectDB();
   const created = await Project.create({
-    name: data.name,
-    track: data.track,
+    name: valid.data.name,
+    track: valid.data.track,
     status: "ANALYZING",
-    city: data.city,
-    gush: data.gush,
-    helka: data.helka,
-    address: data.address,
-    lat: data.lat,
-    lng: data.lng,
+    city: valid.data.city,
+    gush: valid.data.gush,
+    helka: valid.data.helka,
+    address: valid.data.address,
+    lat: valid.data.lat,
+    lng: valid.data.lng,
     plotAreaSqm: data.inputs.rights.plotAreaSqm,
-    marketAnchor: data.marketAnchor,
+    marketAnchor: valid.data.marketAnchor,
     riskAppetite: 0.4,
     inputs: data.inputs,
-    createdBy: session ? session.id : undefined,
+    createdBy: session.id,
   });
   revalidatePath("/dashboard");
   redirect(`/projects/${created._id.toString()}`);
 }
 
 export async function deleteProjectAction(id: string) {
+  const session = await getSession();
+  if (!session) return { error: "נדרשת התחברות" };
+  if (!objectIdSchema.safeParse(id).success) return { error: "מזהה לא תקין" };
   await connectDB();
-  await Project.findByIdAndDelete(id);
+  const deleted = await Project.findOneAndDelete({ _id: id, ...ownedBy(session.id) });
+  if (!deleted) return { error: "הפרויקט לא נמצא או שאינו שלכם" };
   revalidatePath("/dashboard");
   return { ok: true };
 }
@@ -354,6 +449,7 @@ async function createImportedProject(opts: CreateImportedOpts): Promise<string> 
  */
 export async function importTenderAction(t: ImportTenderInput): Promise<ImportResult> {
   if (!(await getSession())) return { requireAuth: true };
+  if (!importTenderSchema.safeParse(t).success) return { error: "נתוני המכרז אינם תקינים" };
   let id = "";
   try {
     id = await createImportedProject({
@@ -386,6 +482,7 @@ export interface ImportRenewalInput {
 /** Create an URBAN_RENEWAL project from a live urban-renewal compound (פינוי-בינוי/תמ"א). */
 export async function importRenewalAction(t: ImportRenewalInput): Promise<ImportResult> {
   if (!(await getSession())) return { requireAuth: true };
+  if (!importRenewalSchema.safeParse(t).success) return { error: "נתוני המתחם אינם תקינים" };
   let id = "";
   try {
     id = await createImportedProject({

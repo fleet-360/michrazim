@@ -6,9 +6,22 @@ import { connectDB } from "./db";
 import { User } from "./models";
 
 const COOKIE = "omdan_session";
-const secret = new TextEncoder().encode(
-  process.env.AUTH_SECRET || "dev_fallback_secret_change_me_please_0123456789",
-);
+
+/**
+ * In production the app refuses to run on the well-known dev secret — a
+ * predictable signing key would let anyone forge a session for any user.
+ * Resolved lazily (not at module load) so `next build` never needs the env.
+ */
+function getSecret(): Uint8Array {
+  const configured = process.env.AUTH_SECRET;
+  if (!configured) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("AUTH_SECRET is required in production — set a 32+ char random secret");
+    }
+    return new TextEncoder().encode("dev_fallback_secret_change_me_please_0123456789");
+  }
+  return new TextEncoder().encode(configured);
+}
 
 export interface SessionUser {
   id: string;
@@ -42,7 +55,7 @@ export async function createSession(user: SessionUser): Promise<void> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(secret);
+    .sign(getSecret());
   const store = await cookies();
   store.set(COOKIE, token, {
     httpOnly: true,
@@ -58,7 +71,7 @@ export async function getSession(): Promise<SessionUser | null> {
   const token = store.get(COOKIE)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, getSecret());
     return {
       id: String(payload.id),
       email: String(payload.email),

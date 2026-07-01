@@ -14,6 +14,10 @@ export interface FinancingParams {
   equityRatio: number; // developer equity share — only the debt portion bears interest
   saleLawGuaranteeRate: number; // annual, on revenue
   totalMonths: number;
+  /** Fraction of units pre-sold at construction start. Buyer payments flow
+   *  into the ליווי account and fund draws, reducing the average financed
+   *  balance (roughly half the presold share of costs is buyer-funded). */
+  presalesFraction?: number;
 }
 
 /** Average outstanding-balance factor for costs drawn on an S-curve. */
@@ -35,9 +39,11 @@ export function computeBaseFinancing(
 ): BaseFinancing {
   const years = p.totalMonths / 12;
   const debtShare = 1 - p.equityRatio;
+  const presales = Math.min(0.9, Math.max(0, p.presalesFraction ?? 0));
+  const presaleRelief = 1 - 0.5 * presales;
 
   const baseInterest =
-    costsExLand * debtShare * p.annualInterestRate * years * AVG_DRAW_FACTOR;
+    costsExLand * debtShare * p.annualInterestRate * years * AVG_DRAW_FACTOR * presaleRelief;
 
   const guaranteeCost = revenue * p.saleLawGuaranteeRate * years * AVG_DRAW_FACTOR;
 

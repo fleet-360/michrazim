@@ -138,6 +138,19 @@ export function quantile(u: Uncertain, p: number): number {
   }
 }
 
+/** Standard normal CDF via the Abramowitz–Stegun erf approximation (7.1.26). */
+export function normalCdf(z: number): number {
+  const sign = z < 0 ? -1 : 1;
+  const x = Math.abs(z) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const erf =
+    1 -
+    (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) *
+      t *
+      Math.exp(-x * x);
+  return 0.5 * (1 + sign * erf);
+}
+
 /** Acklam's rational approximation for the inverse normal CDF. */
 export function inverseNormalCdf(p: number): number {
   if (p <= 0) return -Infinity;

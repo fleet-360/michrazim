@@ -1,7 +1,6 @@
 import type { DealInputs, Track, Uncertain } from "@/lib/engine/types";
 
 const tri = (min: number, mode: number, max: number): Uncertain => ({ kind: "triangular", min, mode, max });
-const fx = (value: number): Uncertain => ({ kind: "fixed", value });
 
 export interface TemplateParams {
   track: Track;
@@ -20,10 +19,10 @@ export interface TemplateParams {
 export function buildInputsFromTemplate(p: TemplateParams): DealInputs {
   const isUrban = p.track === "URBAN_RENEWAL";
   const isRmi = p.track === "RMI";
-  // Renewal delivers BRAND-NEW apartments, which sell above the city's blended
-  // average (that average folds in old stock). A ~12% new-build premium is the
-  // realistic anchor for the sale price of the net new units.
-  const sale = isUrban ? Math.round(p.avgPricePerSqm * 1.12) : p.avgPricePerSqm;
+  // Every track delivers BRAND-NEW apartments, which sell above the city's
+  // blended comp average (that average folds in old stock). Renewal projects
+  // command a slightly higher premium (prime infill locations).
+  const sale = Math.round(p.avgPricePerSqm * (isUrban ? 1.12 : 1.08));
 
   // construction cost scales mildly with price level (premium finishes in pricier areas)
   const cc = Math.round(7600 + (sale - 22000) * 0.06);
@@ -62,6 +61,15 @@ export function buildInputsFromTemplate(p: TemplateParams): DealInputs {
     annualInterestRate: 0.063,
     saleLawGuaranteeRate: 0.008,
     presalesRequirement: 0.2,
+    // Convention: the whole calibration (price anchors from gross nadlan comps
+    // vs. conservative sellable-area/cost assumptions, e.g. ממ"ד excluded from
+    // sellable) is gross-vs-gross. The engine supports VAT netting
+    // (pricesIncludeVat) but flipping it requires recalibrating the cost side
+    // in the same move — keep it an explicit user decision, not a default.
+    pricesIncludeVat: false,
+    vatRate: 0.18,
+    // הצמדה: build costs escalate to mid-construction, fees to permit stage.
+    annualCpiRate: 0.025,
     requiredProfitMarginOnCost: isUrban ? 0.2 : 0.17,
     ...(isUrban
       ? {

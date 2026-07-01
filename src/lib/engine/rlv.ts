@@ -53,6 +53,7 @@ export interface ScenarioCore {
   landCarryFactor: number;
   taxRate: number;
   financeMonths: number;
+  presalesFraction: number;
   scenario: Scenario;
 }
 
@@ -82,21 +83,33 @@ export function computeScenarioCore(
   const netSellableResidentialSqm = rights.sellableResidentialSqm - tenantResidentialSqm;
   const netParkingSpaces = rights.parkingSpaces - tenantParking;
 
-  const residentialRev = netSellableResidentialSqm * scn.salePricePerSqm;
-  const commercialRev = rights.sellableCommercialSqm * scn.commercialPricePerSqm;
-  const parkingRev = netParkingSpaces * inputs.parkingSalePrice;
+  // Market prices (comps) are gross; costs are quoted ex-VAT (input VAT is
+  // creditable), so when prices include VAT the revenue must be netted or the
+  // margin is overstated by the full VAT wedge.
+  const vatNet = inputs.pricesIncludeVat ? 1 / (1 + (inputs.vatRate ?? 0.18)) : 1;
+  const residentialRev = netSellableResidentialSqm * scn.salePricePerSqm * vatNet;
+  const commercialRev = rights.sellableCommercialSqm * scn.commercialPricePerSqm * vatNet;
+  const parkingRev = netParkingSpaces * inputs.parkingSalePrice * vatNet;
   const revenue = residentialRev + commercialRev + parkingRev;
 
-  const construction = rights.totalBuiltSqm * scn.constructionCostPerSqm;
-  const parking = rights.parkingSpaces * inputs.parkingCostPerSpace;
+  // הצמדה: contracts index to CPI/construction-input indices, so costs paid
+  // deep into the timeline cost more in nominal terms. Build costs escalate to
+  // mid-construction; permit-stage fees escalate to end of planning. Revenue is
+  // kept nominal (conservative — price growth is the user's price assumption).
+  const cpi = inputs.annualCpiRate ?? 0;
+  const buildIdx = Math.pow(1 + cpi, (scn.planningMonths + scn.constructionMonths / 2) / 12);
+  const permitIdx = Math.pow(1 + cpi, scn.planningMonths / 12);
+
+  const construction = rights.totalBuiltSqm * scn.constructionCostPerSqm * buildIdx;
+  const parking = rights.parkingSpaces * inputs.parkingCostPerSpace * buildIdx;
   const buildBase = construction + parking;
 
   const professionalFees = buildBase * inputs.professionalFeesPct;
   const management = buildBase * inputs.managementPct;
   const marketing = revenue * inputs.marketingPct;
   const contingency = buildBase * inputs.contingencyPct;
-  const municipalFees = computeMunicipalFees(schedule, rights);
-  const bettermentLevy = scn.bettermentLevy;
+  const municipalFees = computeMunicipalFees(schedule, rights) * permitIdx;
+  const bettermentLevy = scn.bettermentLevy * permitIdx;
   const developmentCostsRMI = inputs.developmentCostsRMI;
 
   const tenantCosts =
@@ -122,6 +135,7 @@ export function computeScenarioCore(
     equityRatio: inputs.equityRatio,
     saleLawGuaranteeRate: inputs.saleLawGuaranteeRate,
     totalMonths: financeMonths,
+    presalesFraction: inputs.presalesRequirement,
   });
 
   const financingBase = fin.baseInterest + fin.guaranteeCost;
@@ -153,6 +167,7 @@ export function computeScenarioCore(
     landCarryFactor: fin.landCarryFactor,
     taxRate,
     financeMonths,
+    presalesFraction: inputs.presalesRequirement,
     scenario: scn,
   };
 }
@@ -200,6 +215,7 @@ export function evaluateBid(core: ScenarioCore, bid: number): BidEvaluation & { 
     planningMonths: core.scenario.planningMonths,
     constructionMonths: core.scenario.constructionMonths,
     salesDurationMonths: core.scenario.salesDurationMonths,
+    presalesFraction: core.presalesFraction,
   });
 
   return { bid, totalCost, profit, marginOnCost, irr: cf.irr, costs };

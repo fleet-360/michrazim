@@ -1,6 +1,7 @@
 import type { DealInputs, FeeSchedule, HistogramBin, MonteCarloStats, Percentiles } from "./types";
-import { makeRng, sample } from "./distributions";
-import { computeScenarioCore, evaluateBid, residualLandValue, type Scenario } from "./rlv";
+import { makeRng } from "./distributions";
+import { computeScenarioCore, evaluateBid, residualLandValue } from "./rlv";
+import { makeScenarioSampler, type CorrelationPair } from "./correlation";
 
 function percentiles(sorted: number[]): Percentiles {
   const n = sorted.length;
@@ -39,6 +40,10 @@ function histogram(values: number[], bins = 30): HistogramBin[] {
 export interface MonteCarloOptions {
   runs?: number;
   seed?: number;
+  /** Sample variables independently (disables the default Gaussian copula). */
+  independent?: boolean;
+  /** Override the default correlation structure. */
+  correlations?: CorrelationPair[];
 }
 
 /**
@@ -54,6 +59,10 @@ export function runMonteCarlo(
 ): MonteCarloStats {
   const runs = opts.runs ?? 5000;
   const rng = makeRng(opts.seed ?? 1337);
+  const sampleScenario = makeScenarioSampler(inputs, {
+    independent: opts.independent,
+    correlations: opts.correlations,
+  });
 
   const profits: number[] = [];
   const margins: number[] = [];
@@ -64,15 +73,7 @@ export function runMonteCarlo(
   let belowTarget = 0;
 
   for (let i = 0; i < runs; i++) {
-    const scn: Scenario = {
-      salePricePerSqm: sample(rng, inputs.salePricePerSqm),
-      commercialPricePerSqm: sample(rng, inputs.commercialPricePerSqm),
-      constructionCostPerSqm: sample(rng, inputs.constructionCostPerSqm),
-      bettermentLevy: Math.max(0, sample(rng, inputs.bettermentLevy)),
-      planningMonths: Math.max(1, sample(rng, inputs.planningMonths)),
-      constructionMonths: Math.max(1, sample(rng, inputs.constructionMonths)),
-      salesDurationMonths: Math.max(1, sample(rng, inputs.salesDurationMonths)),
-    };
+    const scn = sampleScenario(rng);
 
     const core = computeScenarioCore(inputs, schedule, scn);
     const ev = evaluateBid(core, bid);

@@ -30,6 +30,9 @@ export interface CashflowInputs {
   planningMonths: number;
   constructionMonths: number;
   salesDurationMonths: number;
+  /** Fraction of revenue pre-sold at construction start; collected as staged
+   *  buyer payments over the build window instead of the sales tail. */
+  presalesFraction?: number;
 }
 
 /**
@@ -53,6 +56,9 @@ export function computeCashflow(input: CashflowInputs): CashflowResult {
   const totalMonths = Math.max(buildEnd, salesEnd) + 1;
 
   const spendExLand = costs.totalExLand;
+  const presold = Math.min(0.9, Math.max(0, input.presalesFraction ?? 0));
+  const presoldRevenue = revenue * presold;
+  const openRevenue = revenue - presoldRevenue;
 
   const months: CashflowMonth[] = [];
   let cumulative = 0;
@@ -66,10 +72,12 @@ export function computeCashflow(input: CashflowInputs): CashflowResult {
     const curBuild = sCurve((m + 1 - buildStart) / construction);
     const spend = -(curBuild - prevBuild) * spendExLand;
 
-    // revenue on S-curve over the sales window
+    // presold units pay in stages over the build window (חוק המכר schedule);
+    // open-market revenue arrives on the sales-window S-curve
+    const presoldRev = (curBuild - prevBuild) * presoldRevenue;
     const prevSales = sCurve((m - salesStart) / (salesEnd - salesStart));
     const curSales = sCurve((m + 1 - salesStart) / (salesEnd - salesStart));
-    const rev = (curSales - prevSales) * revenue;
+    const rev = presoldRev + (curSales - prevSales) * openRevenue;
 
     const net = land + spend + rev;
     cumulative += net;

@@ -107,7 +107,18 @@ export interface DealInputs {
   equityRatio: number; // developer equity share of total cost
   annualInterestRate: number; // ליווי
   saleLawGuaranteeRate: number; // ערבות חוק מכר, annual on revenue
-  presalesRequirement: number; // fraction pre-sold (informational)
+  /** Fraction of units pre-sold by construction start. Presale receipts fund
+   *  draws in the ליווי account (less interest) and pull revenue forward. */
+  presalesRequirement: number;
+
+  // --- Economics (optional; omitted = off, preserving legacy behavior) ---
+  /** Annual CPI drift (הצמדה למדד) escalating time-distant costs. */
+  annualCpiRate?: number;
+  /** VAT rate applied when pricesIncludeVat (default 0.18). */
+  vatRate?: number;
+  /** True when sale-price inputs are gross market prices (incl. VAT, as
+   *  nadlan comps are); revenue is then netted since costs are ex-VAT. */
+  pricesIncludeVat?: boolean;
 
   // --- Return requirement ---
   requiredProfitMarginOnCost: number; // יזמי, e.g. 0.20

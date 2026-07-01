@@ -1,6 +1,7 @@
 import { Database, FileSpreadsheet } from "lucide-react";
 import { getLiveTenders, getRmiTotals, toListItem } from "@/lib/data/rmi";
-import { getWatchlist } from "@/server/queries";
+import { getWatchlist, getCities } from "@/server/queries";
+import { screenTenders } from "@/server/screener";
 import { TendersExplorer } from "@/components/tenders/tenders-explorer";
 
 export const dynamic = "force-dynamic";
@@ -9,13 +10,15 @@ const subtitleItalic =
   "mt-2 inline-block origin-right text-xs font-normal italic leading-[15px] text-[#5A7184] [transform:skewX(-4deg)] dark:text-slate-400";
 
 export default async function TendersPage() {
-  const [all, totals, watched] = await Promise.all([
+  const [all, totals, watched, cities] = await Promise.all([
     getLiveTenders({ limit: 2000 }),
     getRmiTotals(),
     getWatchlist(),
+    getCities(),
   ]);
   const live = all.some((t) => t.source === "live");
   const tenders = all.map(toListItem);
+  const screen = screenTenders(tenders, cities);
 
   return (
     <div className="space-y-5">
@@ -40,7 +43,7 @@ export default async function TendersPage() {
         )}
       </div>
 
-      <TendersExplorer tenders={tenders} live={live} totals={totals} watched={watched} />
+      <TendersExplorer tenders={tenders} live={live} totals={totals} watched={watched} screen={screen} />
     </div>
   );
 }

@@ -125,6 +125,8 @@ const ProjectSchema = new Schema(
     createdBy: { type: Schema.Types.ObjectId, ref: "User", index: true },
     orgId: { type: Schema.Types.ObjectId, ref: "Organization" },
     coverImage: String,
+    // Deal-room: unguessable token granting read-only access to the report.
+    shareToken: { type: String, index: true },
   },
   { timestamps: true },
 );

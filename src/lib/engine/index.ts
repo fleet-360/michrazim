@@ -26,6 +26,10 @@ export { recommendBid } from "./bidRecommendation";
 export { computeCashflow } from "./cashflow";
 export type { CashflowResult, CashflowMonth } from "./cashflow";
 export { breakEvenSalePrice, breakEvenBid } from "./breakeven";
+export { computeWinCurve, winProbabilityAt } from "./winprobability";
+export type { WinCurve, WinCurveOptions, WinCurvePoint } from "./winprobability";
+export { makeScenarioSampler, DEFAULT_CORRELATIONS } from "./correlation";
+export type { CorrelationPair } from "./correlation";
 
 export type Verdict = "GO" | "CONDITIONAL" | "NO_GO";
 

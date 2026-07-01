@@ -50,6 +50,7 @@ export interface ProjectRow {
   bid?: number;
   riskAppetite?: number;
   inputs: DealInputs;
+  shareToken?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -117,6 +118,18 @@ export async function getProjectById(id: string): Promise<ProjectRow | null> {
   const session = await getSession();
   // owner-scoped: a project with an owner is visible only to that owner
   if (doc.createdBy && (!session || String(doc.createdBy) !== session.id)) return null;
+  return plain<ProjectRow>(doc);
+}
+
+/**
+ * Deal-room access: a project fetched by its unguessable share token, with no
+ * session requirement — this is what investor/bank read-only links resolve.
+ */
+export async function getProjectByShareToken(token: string): Promise<ProjectRow | null> {
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) return null;
+  await connectDB();
+  const doc = await Project.findOne({ shareToken: token }).lean();
+  if (!doc) return null;
   return plain<ProjectRow>(doc);
 }
 

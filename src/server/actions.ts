@@ -363,6 +363,41 @@ export async function createProjectAction(data: NewProjectInput) {
   redirect(`/projects/${created._id.toString()}`);
 }
 
+/**
+ * Deal-room: create (or return) a read-only share link for a project. Every
+ * fundraise and bank ליווי conversation is a distribution channel — the link
+ * renders the live report with no login.
+ */
+export async function enableProjectShareAction(id: string) {
+  const session = await getSession();
+  if (!session) return { error: "נדרשת התחברות" };
+  if (!objectIdSchema.safeParse(id).success) return { error: "מזהה לא תקין" };
+  await connectDB();
+  const project = await Project.findOne({ _id: id, ...ownedBy(session.id) }).select("shareToken");
+  if (!project) return { error: "הפרויקט לא נמצא או שאינו שלכם" };
+  if (!project.shareToken) {
+    const { randomBytes } = await import("crypto");
+    project.shareToken = randomBytes(18).toString("base64url");
+    await project.save();
+  }
+  revalidatePath(`/projects/${id}/report`);
+  return { token: project.shareToken as string };
+}
+
+export async function disableProjectShareAction(id: string) {
+  const session = await getSession();
+  if (!session) return { error: "נדרשת התחברות" };
+  if (!objectIdSchema.safeParse(id).success) return { error: "מזהה לא תקין" };
+  await connectDB();
+  const updated = await Project.findOneAndUpdate(
+    { _id: id, ...ownedBy(session.id) },
+    { $unset: { shareToken: 1 } },
+  );
+  if (!updated) return { error: "הפרויקט לא נמצא או שאינו שלכם" };
+  revalidatePath(`/projects/${id}/report`);
+  return { ok: true };
+}
+
 export async function deleteProjectAction(id: string) {
   const session = await getSession();
   if (!session) return { error: "נדרשת התחברות" };

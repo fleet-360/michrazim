@@ -25,6 +25,8 @@ import {
 import { BidGauge } from "@/components/charts/bid-gauge";
 import { DealScore } from "@/components/charts/deal-score";
 import { TornadoChart } from "@/components/charts/tornado-chart";
+import { WinCurveChart, WinCurveLegend } from "@/components/charts/win-curve";
+import { computeWinCurve, winProbabilityAt } from "@/lib/engine";
 import { AiPanel } from "@/components/ai/ai-panel";
 import { ComparablesTable } from "@/components/project/comparables-table";
 import { DeleteProject } from "@/components/project/delete-project";
@@ -123,6 +125,7 @@ export function ProjectWorkspace(props: WorkspaceProps) {
   );
   const [risk, setRisk] = React.useState(props.initialRisk);
   const [scenario, setScenario] = React.useState<ScenarioKey>("base");
+  const [competitors, setCompetitors] = React.useState(4);
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved] = React.useState(false);
 
@@ -161,6 +164,21 @@ export function ProjectWorkspace(props: WorkspaceProps) {
     maxLandValue: det.maxLandValue,
     bid,
   });
+
+  // Win Curve — closed-form on the expected scenario, cheap enough to track
+  // the raw (undebounced) bid. Renewal has no land bid, so no curve.
+  const winCurve = React.useMemo(
+    () =>
+      props.track === "URBAN_RENEWAL"
+        ? null
+        : computeWinCurve(scenarioInputs, schedule, {
+            expectedCompetitors: competitors,
+            anchor: props.marketAnchor,
+            maxBid: bidMax,
+          }),
+    [scenarioInputs, schedule, competitors, props.marketAnchor, props.track, bidMax],
+  );
+  const currentPWin = winCurve ? winProbabilityAt(winCurve, bid) : 0;
 
   async function save() {
     setSaving(true);
@@ -540,6 +558,40 @@ export function ProjectWorkspace(props: WorkspaceProps) {
                 </div>
               </CardContent>
             </Card>
+
+            {winCurve && (
+              <Card className={cn(workspaceTabPanel, "lg:col-span-2")}>
+                <CardHeader>
+                  <CardTitle>עקומת הזכייה — כמה שווה לזכות?</CardTitle>
+                  <CardDescription>
+                    תוחלת הרווח (סיכוי זכייה × רווח) לכל מחיר הצעה. הקו הירוק — ההצעה האופטימלית; המקווקו — סיכוי הזכייה מול {competitors} מתחרים משוערים.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <WinCurveChart curve={winCurve} currentBid={bid} />
+                  <WinCurveLegend curve={winCurve} currentPWin={currentPWin} currentBid={bid} />
+                  <div className="flex items-center justify-between gap-4 rounded-[var(--radius-md)] border border-border bg-muted/30 p-3">
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      מתחרים משוערים במכרז: <b className="text-foreground tnum">{competitors}</b>
+                    </span>
+                    <div className="w-full max-w-[220px]">
+                      <Slider
+                        variant="brand"
+                        value={[competitors]}
+                        min={1}
+                        max={10}
+                        step={1}
+                        onValueChange={(v) => setCompetitors(v[0])}
+                        aria-label="מספר מתחרים משוער"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    מודל התנהגותי: הצעות המתחרים מפוזרות סביב {props.marketAnchor ? "עוגן השוק/השומה" : "שווי הקרקע לפי המודל"}. הצעה מעל האופטימום מעלה את סיכוי הזכייה אך שוחקת את תוחלת הרווח — זו קללת המנצח במספרים.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </TabsContent>
 

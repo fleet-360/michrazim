@@ -57,7 +57,7 @@ export default async function LoginPage({
           }}
         />
         <div className="relative flex items-center gap-3">
-          <LogoMark className="h-9 w-auto text-white" />
+          <LogoMark className="h-9 w-auto" />
         </div>
 
         <div className="relative space-y-8">

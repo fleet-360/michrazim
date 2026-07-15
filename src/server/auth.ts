@@ -29,9 +29,10 @@ export async function verifyCredentials(
     name: string;
     title?: string;
     role: string;
-    passwordHash: string;
+    passwordHash?: string;
   }>();
-  if (!user) return null;
+  // Google-only accounts have no password — password login is not available for them.
+  if (!user?.passwordHash) return null;
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return null;
   return { id: user._id.toString(), email: user.email, name: user.name, title: user.title, role: user.role };

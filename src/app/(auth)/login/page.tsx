@@ -12,9 +12,9 @@ import {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; next?: string }>;
+  searchParams: Promise<{ mode?: string; next?: string; error?: string }>;
 }) {
-  const { mode, next } = await searchParams;
+  const { mode, next, error } = await searchParams;
   const safeNext =
     next && next.startsWith("/") && !next.startsWith("//")
       ? next
@@ -105,6 +105,7 @@ export default async function LoginPage({
           <AuthForm
             mode={mode === "register" ? "register" : "login"}
             next={next}
+            error={error}
           />
         </div>
       </div>

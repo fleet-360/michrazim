@@ -23,8 +23,8 @@ const STEPS = [
 export function LandingPage({ cities }: { cities: { name: string }[] }) {
   return (
     <main className="relative min-h-screen bg-[#060a1a] text-foreground">
-      {/* Transparent top nav — the brand logo lives inside the hero */}
-      <header className="absolute inset-x-0 top-0 z-40">
+      {/* Fixed top nav — auth buttons stay pinned to the top while scrolling */}
+      <header className="fixed inset-x-0 top-0 z-50">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-end gap-2 px-4 sm:px-6">
           <Button
             asChild

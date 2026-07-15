@@ -14,10 +14,13 @@ export const MODEL_FAST = process.env.ANTHROPIC_MODEL_FAST || "claude-sonnet-4-6
 
 export const AI_ENABLED = () => Boolean(process.env.ANTHROPIC_API_KEY);
 
-/** Single-shot text completion helper. Returns null if AI is unavailable. */
+/**
+ * Single-shot completion helper. Returns null if AI is unavailable.
+ * `user` accepts plain text or content blocks (e.g. a PDF document block + text).
+ */
 export async function complete(opts: {
   system: string;
-  user: string;
+  user: string | Anthropic.ContentBlockParam[];
   model?: string;
   maxTokens?: number;
   temperature?: number;

@@ -12,11 +12,47 @@ import { cn } from "@/lib/utils";
 
 type State = { error?: string } | null;
 
-export function AuthForm({ mode: initialMode, next }: { mode?: "login" | "register"; next?: string }) {
+function GoogleGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.46a5.53 5.53 0 0 1-2.4 3.62v3h3.88c2.27-2.09 3.58-5.17 3.58-8.81Z" />
+      <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-3.01c-1.07.72-2.45 1.15-4.06 1.15-3.13 0-5.78-2.11-6.72-4.95H1.27v3.11A12 12 0 0 0 12 24Z" />
+      <path fill="#FBBC05" d="M5.28 14.28a7.21 7.21 0 0 1 0-4.56V6.61H1.27a12 12 0 0 0 0 10.78l4.01-3.11Z" />
+      <path fill="#EA4335" d="M12 4.77c1.76 0 3.34.61 4.59 1.8l3.44-3.44A11.98 11.98 0 0 0 1.27 6.61l4.01 3.11C6.22 6.88 8.87 4.77 12 4.77Z" />
+    </svg>
+  );
+}
+
+export function AuthForm({
+  mode: initialMode,
+  next,
+  error,
+}: {
+  mode?: "login" | "register";
+  next?: string;
+  error?: string;
+}) {
   const [mode, setMode] = React.useState<"login" | "register">(initialMode === "register" ? "register" : "login");
 
   return (
     <div>
+      <a
+        href={`/api/auth/google${next ? `?next=${encodeURIComponent(next)}` : ""}`}
+        className="flex w-full items-center justify-center gap-3 rounded-[var(--radius-md)] border border-border bg-card py-2.5 text-sm font-medium transition-colors hover:bg-muted/60"
+      >
+        <GoogleGlyph className="size-4.5" />
+        התחברות עם Google
+      </a>
+      {error === "google" && (
+        <div className="mt-3">
+          <ErrorMsg error="ההתחברות עם Google נכשלה — נסו שוב או השתמשו באימייל וסיסמה" />
+        </div>
+      )}
+      <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="h-px flex-1 bg-border" />
+        או
+        <span className="h-px flex-1 bg-border" />
+      </div>
       <div className="mb-6 grid grid-cols-2 gap-1 rounded-[var(--radius-md)] bg-muted/60 p-1">
         {(["login", "register"] as const).map((m) => (
           <button

@@ -180,37 +180,94 @@ ${text.slice(0, 12000)}
 }
 
 export interface ParsedTender {
+  /** Tender title, e.g. "מכרז לבניה רוויה בשכונת..." */
+  name?: string;
+  /** Official tender id, e.g. "ים/123/2025". */
+  tenderId?: string;
   city?: string;
+  /** Neighborhood / address / מתחם. */
+  site?: string;
   gush?: string;
   helka?: string;
+  /** מגרש number(s). */
+  plotNumber?: string;
   plotAreaSqm?: number;
   far?: number;
   units?: number;
+  /** תב"ע / plan number. */
+  planNumber?: string;
+  /** מחיר מינימום (₪). */
+  minPrice?: number;
   developmentCost?: number;
+  /** יזם / חברה מפתחת (אם צוינה). */
+  developer?: string;
   submissionDeadline?: string;
   notes?: string;
 }
 
-/** Extract structured fields from raw tender-booklet text. */
-export async function parseTenderText(text: string): Promise<ParsedTender | null> {
-  const out = await complete({
-    model: MODEL_FAST,
-    system:
-      "אתה מחלץ נתונים מובנים מחוברות מכרז של רשות מקרקעי ישראל. החזר JSON תקין בלבד, ללא טקסט נוסף.",
-    maxTokens: 700,
-    temperature: 0,
-    user: `חלץ מהטקסט הבא את השדות והחזר JSON עם המפתחות: city, gush, helka, plotAreaSqm, far, units, developmentCost, submissionDeadline, notes. אם שדה חסר — השמט אותו.
+const TENDER_SYSTEM =
+  "אתה מחלץ נתונים מובנים מחוברות מכרז של רשות מקרקעי ישראל. החזר JSON תקין בלבד, ללא טקסט נוסף.";
 
-טקסט המכרז:
-"""
-${text.slice(0, 6000)}
-"""`,
-  });
-  if (!out) return null;
+const TENDER_PROMPT = `חלץ מחוברת המכרז את השדות והחזר JSON עם המפתחות:
+name (כותרת המכרז), tenderId (מספר מכרז, למשל "ים/123/2025"), city, site (שכונה/מתחם/כתובת), gush, helka, plotNumber (מגרש), plotAreaSqm, far (אחוזי בניה כמקדם, למשל 3.0), units (יח"ד), planNumber (מספר תב"ע), minPrice (מחיר מינימום בש"ח), developmentCost (הוצאות פיתוח בש"ח), developer, submissionDeadline (YYYY-MM-DD), notes (הערה חשובה אחת בעברית).
+מספרים כמספרים בלבד (בלי פסיקים/₪), תאריכים בפורמט YYYY-MM-DD. אם שדה חסר — השמט אותו.`;
+
+function extractJsonObject(out: string): ParsedTender | null {
   try {
     const json = out.slice(out.indexOf("{"), out.lastIndexOf("}") + 1);
     return JSON.parse(json) as ParsedTender;
   } catch {
     return null;
   }
+}
+
+/** Extract structured fields from raw tender-booklet text. */
+export async function parseTenderText(text: string): Promise<ParsedTender | null> {
+  const out = await complete({
+    model: MODEL_FAST,
+    system: TENDER_SYSTEM,
+    maxTokens: 1000,
+    temperature: 0,
+    user: `${TENDER_PROMPT}
+
+טקסט המכרז:
+"""
+${text.slice(0, 12000)}
+"""`,
+  });
+  if (!out) return null;
+  return extractJsonObject(out);
+}
+
+/**
+ * Extract structured fields from an uploaded tender-booklet PDF (base64).
+ * Document blocks are OCR'd by the model, so scanned booklets work too.
+ */
+export async function parseTenderDocument(
+  pdfBase64: string,
+  supplementText?: string,
+): Promise<ParsedTender | null> {
+  const prompt = supplementText?.trim()
+    ? `${TENDER_PROMPT}
+
+טקסט משלים שסיפק המשתמש:
+"""
+${supplementText.slice(0, 4000)}
+"""`
+    : TENDER_PROMPT;
+  const out = await complete({
+    model: MODEL_FAST,
+    system: TENDER_SYSTEM,
+    maxTokens: 1000,
+    temperature: 0,
+    user: [
+      {
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: pdfBase64 },
+      },
+      { type: "text", text: prompt },
+    ],
+  });
+  if (!out) return null;
+  return extractJsonObject(out);
 }

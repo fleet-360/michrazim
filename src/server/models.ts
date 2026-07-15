@@ -16,7 +16,12 @@ const UserSchema = new Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, required: true },
-    passwordHash: { type: String, required: true },
+    // optional: Google-only accounts have no password
+    passwordHash: { type: String },
+    // social login (Sign in with Google)
+    googleId: { type: String, index: true, sparse: true },
+    avatarUrl: String,
+    provider: { type: String, enum: ["password", "google"], default: "password" },
     role: { type: String, enum: ["admin", "analyst", "viewer"], default: "analyst" },
     orgId: { type: Schema.Types.ObjectId, ref: "Organization" },
     title: String,

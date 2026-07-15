@@ -2,14 +2,18 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { connectDB } from "./db";
 import { AiInsight, Project, Comparable, City, User } from "./models";
 import { getProjectById, getCities } from "./queries";
 import { verifyCredentials, createSession, destroySession, getSession } from "./auth";
-import { analyzeProject } from "./analysis";
-import { riskAnalysis, answerQuestion, decisionReport, parseTenderText, methodologyAssistant, parseDealsText, type ProjectMeta } from "@/lib/ai/insights";
+import { analyzeProject, feeScheduleFor } from "./analysis";
+import { VIEW_COOKIE, type ViewMode } from "@/lib/view-mode";
+import { riskAnalysis, answerQuestion, decisionReport, parseTenderText, parseTenderDocument, methodologyAssistant, parseDealsText, type ProjectMeta, type ParsedTender } from "@/lib/ai/insights";
 import { derivePlotForUnits } from "@/lib/import-derive";
+import { fetchPlansAtPoint, fetchPlansByNumber, type PlanInfo } from "@/lib/data/iplan";
+import { fetchParcelByGushHelka, govmapGeocode } from "@/lib/data/govmap";
 import type { DealInputs, Track } from "@/lib/engine/types";
 
 /** Only allow same-origin relative redirects (guard against open-redirect). */
@@ -55,6 +59,313 @@ export async function registerAction(_prev: unknown, formData: FormData) {
 export async function logoutAction() {
   await destroySession();
   redirect("/login");
+}
+
+/** Persist the preferred interface (lean/full) and land on its home screen. */
+export async function setViewModeAction(mode: ViewMode) {
+  const store = await cookies();
+  store.set(VIEW_COOKIE, mode === "full" ? "full" : "lean", {
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+  redirect(mode === "full" ? "/dashboard" : "/quick");
+}
+
+const TRIAL_COOKIE = "omdan_trial";
+
+export interface QuickAnalyzeInput {
+  track: "RMI" | "URBAN_RENEWAL";
+  city: string;
+  units: number;
+  developCost?: number;
+  existingUnits?: number;
+}
+
+export interface QuickAnalyzeResult {
+  recommendedBid: number;
+  expectedProfit: number;
+  marginOnCost: number;
+  probabilityOfLoss: number;
+  verdict: "GO" | "CONDITIONAL" | "NO_GO";
+  verdictReason: string;
+  revenue: number;
+  totalCost: number;
+  plotAreaSqm: number;
+  units: number;
+}
+
+/**
+ * The lean quick-calculator: analyze a deal without saving anything.
+ * Anonymous visitors get ONE free analysis (soft cookie limit), then must register.
+ */
+export async function quickAnalyzeAction(
+  input: QuickAnalyzeInput,
+): Promise<{ result: QuickAnalyzeResult } | { requireAuth: true } | { error: string }> {
+  const session = await getSession();
+  const store = await cookies();
+  if (!session && store.get(TRIAL_COOKIE)) return { requireAuth: true };
+
+  if (!input.city) return { error: "נא לבחור עיר" };
+  const units = Math.max(8, Math.round(input.units || 0));
+  if (!units) return { error: "נא להזין מספר יחידות דיור" };
+
+  try {
+    const cities = await getCities();
+    const cityRow = cities.find((c) => c.name === input.city);
+    const avgPrice = cityRow?.avgResidentialPricePerSqm ?? 26000;
+    const far = input.track === "URBAN_RENEWAL" ? 4.5 : 3.0;
+    const plotAreaSqm = derivePlotForUnits(units, far);
+    const inputs = buildInputsFromTemplate({
+      track: input.track,
+      city: input.city,
+      plotAreaSqm,
+      far,
+      avgPricePerSqm: avgPrice,
+      existingUnits:
+        input.track === "URBAN_RENEWAL" && input.existingUnits && input.existingUnits > 0
+          ? input.existingUnits
+          : undefined,
+    });
+    if (input.track === "RMI" && input.developCost && input.developCost > 0) {
+      inputs.developmentCostsRMI = input.developCost;
+    }
+
+    const analysis = analyzeProject({ inputs, city: input.city }, cities, { runs: 4000 });
+
+    // Burn the anonymous trial only after a successful run.
+    if (!session) {
+      store.set(TRIAL_COOKIE, "1", {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+      });
+    }
+
+    return {
+      result: {
+        recommendedBid: analysis.recommendation.recommendedBid,
+        expectedProfit: analysis.bidEvaluation.profit,
+        marginOnCost: analysis.bidEvaluation.marginOnCost,
+        probabilityOfLoss: analysis.monteCarlo.probabilityOfLoss,
+        verdict: analysis.verdict,
+        verdictReason: analysis.verdictReason,
+        revenue: analysis.bidEvaluation.totalCost + analysis.bidEvaluation.profit,
+        totalCost: analysis.bidEvaluation.totalCost,
+        plotAreaSqm,
+        units,
+      },
+    };
+  } catch (e) {
+    console.error("quickAnalyzeAction failed:", e);
+    return { error: "הניתוח נכשל — בדקו את החיבור למסד הנתונים ונסו שוב." };
+  }
+}
+
+export interface TenderLocationDTO {
+  lat: number;
+  lng: number;
+  /** Measured parcel area when the cadastral lookup succeeded. */
+  areaSqm?: number;
+  /** How precise the location is: exact parcel > address geocode > city centroid. */
+  origin: "parcel" | "geocode" | "city";
+  gush?: string;
+  helka?: string;
+  label?: string;
+}
+
+export interface TenderMarketDTO {
+  city: string;
+  avgPricePerSqm: number;
+  priceSource: "city-db" | "default";
+  fees: {
+    buildingFeePerSqm: number;
+    sewageLevyPerSqm: number;
+    waterLevyPerSqm: number;
+    roadsLevyPerSqm: number;
+    drainageLevyPerSqm: number;
+    openSpaceLevyPerSqm: number;
+  };
+  feesSource: "city-db" | "default";
+}
+
+export interface TenderReportDTO {
+  tender: ParsedTender;
+  plans: PlanInfo[];
+  location: TenderLocationDTO | null;
+  market: TenderMarketDTO | null;
+  estimate: QuickAnalyzeResult | null;
+  warnings: string[];
+}
+
+/** Site strings that can actually be geocoded (not plot codes like "מגרש 12"). */
+function looksLikePlace(s?: string): boolean {
+  return !!s && s.trim().length >= 3 && !/מגרש|^[\d,\-./\s]+$/.test(s.trim());
+}
+
+/**
+ * The upload-your-own-tender flow: parse (text/PDF) → locate → live תב"ע plans →
+ * market context → secondary economic estimate. Data-first: every enrichment
+ * panel is independent, so partial failures degrade to warnings, not errors.
+ * Anonymous visitors get ONE free report (same cookie gate as quickAnalyzeAction).
+ */
+export async function analyzeTenderUploadAction(input: {
+  text?: string;
+  pdfBase64?: string;
+}): Promise<{ report: TenderReportDTO } | { requireAuth: true } | { error: string }> {
+  const session = await getSession();
+  const store = await cookies();
+  if (!session && store.get(TRIAL_COOKIE)) return { requireAuth: true };
+
+  const text = (input.text ?? "").trim();
+  const pdf = (input.pdfBase64 ?? "").trim();
+  if (!pdf && text.length < 40) {
+    return { error: "נא להדביק את טקסט המכרז (לפחות כמה שורות) או להעלות קובץ PDF" };
+  }
+  if (pdf && pdf.length > 12_000_000) return { error: "הקובץ גדול מדי — עד 8MB" };
+  if (pdf && !/^[A-Za-z0-9+/=\s]+$/.test(pdf.slice(0, 200))) return { error: "קובץ לא תקין" };
+
+  // 1. Parse — a failure here is a real error (nothing to report on), trial NOT burned.
+  const tender = pdf ? await parseTenderDocument(pdf, text || undefined) : await parseTenderText(text);
+  if (!tender) return { error: "לא הצלחתי לחלץ נתונים מהמכרז — נסו טקסט מפורט יותר" };
+
+  const warnings: string[] = [];
+
+  // 2. Locate: exact parcel → address/site geocode → city centroid.
+  let location: TenderLocationDTO | null = null;
+  try {
+    if (tender.gush && tender.helka) {
+      const parcel = await fetchParcelByGushHelka(tender.gush, tender.helka);
+      if (parcel) {
+        location = {
+          lat: parcel.centroid[1],
+          lng: parcel.centroid[0],
+          areaSqm: Math.round(parcel.areaSqm),
+          origin: "parcel",
+          gush: tender.gush,
+          helka: tender.helka,
+        };
+      }
+    }
+    if (!location && tender.city && looksLikePlace(tender.site)) {
+      const hit = await govmapGeocode(`${tender.site}, ${tender.city}`);
+      if (hit) {
+        location = {
+          lat: hit.lat,
+          lng: hit.lng,
+          origin: "geocode",
+          gush: hit.gush ?? tender.gush,
+          helka: hit.parcel ?? tender.helka,
+          label: hit.label,
+        };
+      }
+    }
+    if (!location && tender.city) {
+      const c = geocodeCity(tender.city);
+      if (c) location = { lat: c.lat, lng: c.lng, origin: "city", gush: tender.gush, helka: tender.helka };
+    }
+  } catch (e) {
+    console.error("tender locate failed:", e);
+  }
+  if (!location) warnings.push("לא הצלחתי לאתר את המגרש על המפה — נתוני התכנון עשויים להיות חלקיים");
+
+  // 3. Live תב"ע plans from the Planning Administration (XPlan).
+  let plans: PlanInfo[] = [];
+  try {
+    if (location) plans = await fetchPlansAtPoint(location.lat, location.lng);
+    if (tender.planNumber) {
+      const byNumber = await fetchPlansByNumber(tender.planNumber);
+      const seen = new Set(byNumber.map((p) => p.planNumber));
+      plans = [...byNumber, ...plans.filter((p) => !seen.has(p.planNumber))];
+    }
+  } catch (e) {
+    console.error("xplan lookup failed:", e);
+  }
+  if (!plans.length && location) warnings.push("שירות התכנון (XPlan) לא החזיר תכניות לנקודה זו");
+
+  // 4. Market context (city price anchor + municipal fee schedule).
+  let market: TenderMarketDTO | null = null;
+  try {
+    if (tender.city) {
+      const cities = await getCities();
+      const cityRow = cities.find((c) => c.name === tender.city);
+      const schedule = feeScheduleFor(tender.city, cities);
+      market = {
+        city: tender.city,
+        avgPricePerSqm: cityRow?.avgResidentialPricePerSqm ?? 26000,
+        priceSource: cityRow?.avgResidentialPricePerSqm ? "city-db" : "default",
+        fees: {
+          buildingFeePerSqm: schedule.buildingFeePerSqm,
+          sewageLevyPerSqm: schedule.sewageLevyPerSqm,
+          waterLevyPerSqm: schedule.waterLevyPerSqm,
+          roadsLevyPerSqm: schedule.roadsLevyPerSqm,
+          drainageLevyPerSqm: schedule.drainageLevyPerSqm,
+          openSpaceLevyPerSqm: schedule.openSpaceLevyPerSqm,
+        },
+        feesSource: cityRow ? "city-db" : "default",
+      };
+    }
+  } catch (e) {
+    console.error("tender market context failed:", e);
+    warnings.push("נתוני השוק והאגרות אינם זמינים כרגע");
+  }
+
+  // 5. Secondary economic estimate (data-first: skipped quietly when inputs are thin).
+  let estimate: QuickAnalyzeResult | null = null;
+  try {
+    const hasGeometry = tender.plotAreaSqm && tender.far;
+    if (tender.city && (tender.units || hasGeometry)) {
+      const far = tender.far ?? 3.0;
+      const units = Math.max(8, Math.round(tender.units ?? 0));
+      const plotAreaSqm =
+        tender.plotAreaSqm && tender.plotAreaSqm > 0
+          ? tender.plotAreaSqm
+          : derivePlotForUnits(units, far);
+      const cities = await getCities();
+      const avgPrice = market?.avgPricePerSqm ?? 26000;
+      const inputs = buildInputsFromTemplate({
+        track: "RMI",
+        city: tender.city,
+        plotAreaSqm,
+        far,
+        avgPricePerSqm: avgPrice,
+      });
+      if (tender.developmentCost && tender.developmentCost > 0) {
+        inputs.developmentCostsRMI = tender.developmentCost;
+      }
+      const analysis = analyzeProject({ inputs, city: tender.city }, cities, { runs: 4000 });
+      estimate = {
+        recommendedBid: analysis.recommendation.recommendedBid,
+        expectedProfit: analysis.bidEvaluation.profit,
+        marginOnCost: analysis.bidEvaluation.marginOnCost,
+        probabilityOfLoss: analysis.monteCarlo.probabilityOfLoss,
+        verdict: analysis.verdict,
+        verdictReason: analysis.verdictReason,
+        revenue: analysis.bidEvaluation.totalCost + analysis.bidEvaluation.profit,
+        totalCost: analysis.bidEvaluation.totalCost,
+        plotAreaSqm,
+        units: tender.units ?? Math.max(8, Math.round(((plotAreaSqm * far * 0.82) - plotAreaSqm * 0.12) / 92)),
+      };
+    } else {
+      warnings.push("אין מספיק נתונים לאומדן כלכלי (חסרים יח״ד או שטח מגרש ואחוזי בניה)");
+    }
+  } catch (e) {
+    console.error("tender estimate failed:", e);
+    warnings.push("האומדן הכלכלי אינו זמין כרגע (בדקו את חיבור מסד הנתונים)");
+  }
+
+  // Burn the anonymous trial only after a report was actually produced.
+  if (!session) {
+    store.set(TRIAL_COOKIE, "1", {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+
+  return { report: { tender, plans, location, market, estimate, warnings } };
 }
 
 /** Add/remove a tender from the signed-in user's watchlist (favorites). */
@@ -143,9 +454,12 @@ export async function askProjectQuestion(id: string, question: string) {
   return { content };
 }
 
-export async function parseTenderAction(text: string) {
-  const parsed = await parseTenderText(text);
-  if (!parsed) return { error: "לא הצלחתי לחלץ נתונים מהטקסט" };
+export async function parseTenderAction(input: { text?: string; pdfBase64?: string }) {
+  const text = (input.text ?? "").trim();
+  const pdf = (input.pdfBase64 ?? "").trim();
+  if (!pdf && !text) return { error: "נא להדביק טקסט או להעלות קובץ PDF" };
+  const parsed = pdf ? await parseTenderDocument(pdf, text || undefined) : await parseTenderText(text);
+  if (!parsed) return { error: "לא הצלחתי לחלץ נתונים מהמכרז" };
   return { parsed };
 }
 

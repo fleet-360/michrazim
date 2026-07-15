@@ -42,8 +42,10 @@ export function NewProjectWizard({ cities }: { cities: CityOpt[] }) {
   const [avgPrice, setAvgPrice] = React.useState(cities[0]?.avgResidentialPricePerSqm ?? 28000);
   const [existingUnits, setExistingUnits] = React.useState(40);
   const [tenderText, setTenderText] = React.useState("");
+  const [tenderPdf, setTenderPdf] = React.useState<{ name: string; base64: string } | null>(null);
   const [parsing, setParsing] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
+  const pdfInputRef = React.useRef<HTMLInputElement>(null);
 
   const city = cities.find((c) => c.name === cityName);
 
@@ -66,18 +68,33 @@ export function NewProjectWizard({ cities }: { cities: CityOpt[] }) {
   }, [inputs, cityName, cities]);
 
   async function parseTender() {
-    if (!tenderText.trim()) return;
+    if (!tenderText.trim() && !tenderPdf) return;
     setParsing(true);
-    const res = await parseTenderAction(tenderText);
+    const res = await parseTenderAction({ text: tenderText, pdfBase64: tenderPdf?.base64 });
     setParsing(false);
     if ("error" in res) return toast.error(res.error);
     const p = res.parsed;
+    if (p.name && !name.trim()) setName(p.name);
     if (p.city && cities.some((c) => c.name === p.city)) setCityName(p.city);
+    if (p.site && !address.trim()) setAddress(p.site);
     if (p.gush) setGush(String(p.gush));
     if (p.helka) setHelka(String(p.helka));
     if (p.plotAreaSqm) setPlotArea(p.plotAreaSqm);
     if (p.far) setFar(p.far);
     toast.success("הנתונים חולצו מהמכרז ומולאו אוטומטית");
+  }
+
+  function pickTenderPdf(file: File | null | undefined) {
+    if (!file) return;
+    if (file.type !== "application/pdf") return toast.error("ניתן להעלות קובץ PDF בלבד");
+    if (file.size > 8 * 1024 * 1024) return toast.error("הקובץ גדול מדי — עד 8MB");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result ?? "");
+      setTenderPdf({ name: file.name, base64: dataUrl.slice(dataUrl.indexOf(",") + 1) });
+    };
+    reader.onerror = () => toast.error("קריאת הקובץ נכשלה");
+    reader.readAsDataURL(file);
   }
 
   async function submit() {
@@ -162,10 +179,46 @@ export function NewProjectWizard({ cities }: { cities: CityOpt[] }) {
                 placeholder="הדביקו כאן טקסט מחוברת המכרז — והמערכת תחלץ גוש, חלקה, שטח ומקדם בנייה…"
                 className="h-20 w-full resize-none rounded-[var(--radius-md)] border border-input bg-card p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
-              <Button size="sm" variant="outline" className="mt-2 gap-2" onClick={parseTender} disabled={parsing || !tenderText.trim()}>
-                {parsing ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
-                חלץ נתונים
-              </Button>
+              <input
+                ref={pdfInputRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  pickTenderPdf(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={parseTender}
+                  disabled={parsing || (!tenderText.trim() && !tenderPdf)}
+                >
+                  {parsing ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
+                  חלץ נתונים
+                </Button>
+                {tenderPdf ? (
+                  <button
+                    type="button"
+                    onClick={() => setTenderPdf(null)}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    title="הסרת הקובץ"
+                  >
+                    <span className="max-w-40 truncate" dir="ltr">{tenderPdf.name}</span> ✕
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => pdfInputRef.current?.click()}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    או העלו חוברת PDF (עד 8MB)
+                  </button>
+                )}
+              </div>
             </div>
 
             <Field label="שם הפרויקט">

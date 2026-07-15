@@ -199,6 +199,12 @@ export interface ParsedTender {
   /** מחיר מינימום (₪). */
   minPrice?: number;
   developmentCost?: number;
+  /** זכויות בנייה עיקריות במ"ר (שטח עיקרי), כשמצוין בחוברת. */
+  mainRightsSqm?: number;
+  /** שטחי שירות במ"ר, כשמצוין. */
+  serviceRightsSqm?: number;
+  /** מסלול שיווק מיוחד: "מחיר מטרה" / "מחיר למשתכן" / "השכרה" — משנה את הכלכלה. */
+  specialTrack?: string;
   /** יזם / חברה מפתחת (אם צוינה). */
   developer?: string;
   submissionDeadline?: string;
@@ -209,16 +215,43 @@ const TENDER_SYSTEM =
   "אתה מחלץ נתונים מובנים מחוברות מכרז של רשות מקרקעי ישראל. החזר JSON תקין בלבד, ללא טקסט נוסף.";
 
 const TENDER_PROMPT = `חלץ מחוברת המכרז את השדות והחזר JSON עם המפתחות:
-name (כותרת המכרז), tenderId (מספר מכרז, למשל "ים/123/2025"), city, site (שכונה/מתחם/כתובת), gush, helka, plotNumber (מגרש), plotAreaSqm, far (אחוזי בניה כמקדם, למשל 3.0), units (יח"ד), planNumber (מספר תב"ע), minPrice (מחיר מינימום בש"ח), developmentCost (הוצאות פיתוח בש"ח), developer, submissionDeadline (YYYY-MM-DD), notes (הערה חשובה אחת בעברית).
-מספרים כמספרים בלבד (בלי פסיקים/₪), תאריכים בפורמט YYYY-MM-DD. אם שדה חסר — השמט אותו.`;
+name (כותרת המכרז), tenderId (מספר מכרז, למשל "ים/123/2025"), city, site (שכונה/מתחם/כתובת), gush, helka, plotNumber (מגרש), plotAreaSqm, far (אחוזי בניה כמקדם, למשל 3.0), units (יח"ד), planNumber (מספר תב"ע), minPrice (מחיר מינימום בש"ח), developmentCost (הוצאות פיתוח בש"ח), mainRightsSqm (זכויות בנייה עיקריות במ"ר אם צוינו, למשל "160 מ"ר שטח עיקרי"), serviceRightsSqm (שטחי שירות במ"ר אם צוינו), specialTrack (אם המכרז במסלול מיוחד: "מחיר מטרה" / "מחיר למשתכן" / "השכרה" — אחרת השמט), developer, submissionDeadline (YYYY-MM-DD), notes (הערה חשובה אחת בעברית — כולל התחייבויות מיוחדות של הזוכה אם יש, כמו הקמת מבני ציבור/משרדים).
+מספרים כמספרים בלבד (בלי פסיקים/₪), תאריכים בפורמט YYYY-MM-DD. אם שדה חסר — השמט אותו. אם מספר מגרשים באותה חוברת — חלץ את הראשון/המרכזי.
+חשוב: אם מופיעות זכויות בנייה במ"ר — חובה לחלץ אותן. דוגמה: "זכויות בנייה: 160 מ"ר שטח עיקרי + 88 מ"ר שטחי שירות" → mainRightsSqm=160, serviceRightsSqm=88. דוגמה: "27,322 מ"ר עיקרי ו-13,224 מ"ר שטחי שירות" → mainRightsSqm=27322, serviceRightsSqm=13224.
+חשוב: specialTrack — אם מוזכר "מחיר מטרה" / "מחיר למשתכן" / "דיור להשכרה" / "השכרה ארוכת טווח" בכל מקום בחוברת, חובה להחזיר את שם המסלול.`;
 
 function extractJsonObject(out: string): ParsedTender | null {
   try {
     const json = out.slice(out.indexOf("{"), out.lastIndexOf("}") + 1);
-    return JSON.parse(json) as ParsedTender;
+    return normalizeTender(JSON.parse(json) as ParsedTender);
   } catch {
     return null;
   }
+}
+
+/** Models sometimes emit gush/helka as numbers and numeric fields as strings — normalize. */
+function normalizeTender(t: ParsedTender): ParsedTender {
+  const s = (v: unknown) => (v === undefined || v === null ? undefined : String(v).trim() || undefined);
+  const n = (v: unknown) => {
+    const x = typeof v === "string" ? Number(v.replace(/[,₪\s]/g, "")) : Number(v);
+    return Number.isFinite(x) && x > 0 ? x : undefined;
+  };
+  return {
+    ...t,
+    tenderId: s(t.tenderId),
+    gush: s(t.gush),
+    helka: s(t.helka),
+    plotNumber: s(t.plotNumber),
+    planNumber: s(t.planNumber),
+    specialTrack: s(t.specialTrack),
+    plotAreaSqm: n(t.plotAreaSqm),
+    far: n(t.far),
+    units: n(t.units),
+    minPrice: n(t.minPrice),
+    developmentCost: n(t.developmentCost),
+    mainRightsSqm: n(t.mainRightsSqm),
+    serviceRightsSqm: n(t.serviceRightsSqm),
+  };
 }
 
 /** Extract structured fields from raw tender-booklet text. */

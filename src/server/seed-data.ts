@@ -390,7 +390,10 @@ export const SEED_PROJECTS: SeedProject[] = [
       presalesRequirement: 0.25,
       requiredProfitMarginOnCost: 0.2,
       existingUnits: 48,
-      tenantCompensationPerUnit: 1_950_000,
+      // CASH rehousing cost only (grants, top-ups, legal). The tenants' new
+      // apartments are already priced in as construction cost + foregone sale
+      // in rlv.ts — a ~₪2M cash figure here double-counts them and sinks the deal.
+      tenantCompensationPerUnit: 280_000,
       tenantRentMonths: 44,
       tenantRentPerUnit: 7800,
     },

@@ -9,12 +9,18 @@ import { AiInsight, Project, Comparable, City, User } from "./models";
 import { getProjectById, getCities } from "./queries";
 import { verifyCredentials, createSession, destroySession, getSession } from "./auth";
 import { analyzeProject, feeScheduleFor } from "./analysis";
-import { VIEW_COOKIE, type ViewMode } from "@/lib/view-mode";
+import { VIEW_COOKIE, VIEW_HOME, isViewMode, type ViewMode } from "@/lib/view-mode";
 import { riskAnalysis, answerQuestion, decisionReport, parseTenderText, parseTenderDocument, methodologyAssistant, parseDealsText, type ProjectMeta, type ParsedTender } from "@/lib/ai/insights";
 import { derivePlotForUnits } from "@/lib/import-derive";
 import { fetchPlansAtPoint, fetchPlansByNumber, type PlanInfo } from "@/lib/data/iplan";
 import { fetchParcelByGushHelka, govmapGeocode } from "@/lib/data/govmap";
 import type { DealInputs, Track } from "@/lib/engine/types";
+import {
+  buildTenderIntelligence,
+  type TenderLocationDTO as LocationDTO,
+  type TenderMarketDTO as MarketDTO,
+  type TenderReportDTO as ReportDTO,
+} from "./tender-estimate";
 
 /** Only allow same-origin relative redirects (guard against open-redirect). */
 function safeNext(next: string): string {
@@ -61,15 +67,16 @@ export async function logoutAction() {
   redirect("/login");
 }
 
-/** Persist the preferred interface (lean/full) and land on its home screen. */
+/** Persist the preferred interface (lean/full/custom) and land on its home screen. */
 export async function setViewModeAction(mode: ViewMode) {
+  const safe: ViewMode = isViewMode(mode) ? mode : "lean";
   const store = await cookies();
-  store.set(VIEW_COOKIE, mode === "full" ? "full" : "lean", {
+  store.set(VIEW_COOKIE, safe, {
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
   });
-  redirect(mode === "full" ? "/dashboard" : "/quick");
+  redirect(VIEW_HOME[safe]);
 }
 
 const TRIAL_COOKIE = "omdan_trial";
@@ -163,41 +170,13 @@ export async function quickAnalyzeAction(
   }
 }
 
-export interface TenderLocationDTO {
-  lat: number;
-  lng: number;
-  /** Measured parcel area when the cadastral lookup succeeded. */
-  areaSqm?: number;
-  /** How precise the location is: exact parcel > address geocode > city centroid. */
-  origin: "parcel" | "geocode" | "city";
-  gush?: string;
-  helka?: string;
-  label?: string;
-}
-
-export interface TenderMarketDTO {
-  city: string;
-  avgPricePerSqm: number;
-  priceSource: "city-db" | "default";
-  fees: {
-    buildingFeePerSqm: number;
-    sewageLevyPerSqm: number;
-    waterLevyPerSqm: number;
-    roadsLevyPerSqm: number;
-    drainageLevyPerSqm: number;
-    openSpaceLevyPerSqm: number;
-  };
-  feesSource: "city-db" | "default";
-}
-
-export interface TenderReportDTO {
-  tender: ParsedTender;
-  plans: PlanInfo[];
-  location: TenderLocationDTO | null;
-  market: TenderMarketDTO | null;
-  estimate: QuickAnalyzeResult | null;
-  warnings: string[];
-}
+export type {
+  TenderLocationDTO,
+  TenderMarketDTO,
+  TenderEstimateDTO,
+  MinPriceComparisonDTO,
+  TenderReportDTO,
+} from "./tender-estimate";
 
 /** Site strings that can actually be geocoded (not plot codes like "מגרש 12"). */
 function looksLikePlace(s?: string): boolean {
@@ -213,7 +192,7 @@ function looksLikePlace(s?: string): boolean {
 export async function analyzeTenderUploadAction(input: {
   text?: string;
   pdfBase64?: string;
-}): Promise<{ report: TenderReportDTO } | { requireAuth: true } | { error: string }> {
+}): Promise<{ report: ReportDTO } | { requireAuth: true } | { error: string }> {
   const session = await getSession();
   const store = await cookies();
   if (!session && store.get(TRIAL_COOKIE)) return { requireAuth: true };
@@ -233,7 +212,7 @@ export async function analyzeTenderUploadAction(input: {
   const warnings: string[] = [];
 
   // 2. Locate: exact parcel → address/site geocode → city centroid.
-  let location: TenderLocationDTO | null = null;
+  let location: LocationDTO | null = null;
   try {
     if (tender.gush && tender.helka) {
       const parcel = await fetchParcelByGushHelka(tender.gush, tender.helka);
@@ -285,7 +264,7 @@ export async function analyzeTenderUploadAction(input: {
   if (!plans.length && location) warnings.push("שירות התכנון (XPlan) לא החזיר תכניות לנקודה זו");
 
   // 4. Market context (city price anchor + municipal fee schedule).
-  let market: TenderMarketDTO | null = null;
+  let market: MarketDTO | null = null;
   try {
     if (tender.city) {
       const cities = await getCities();
@@ -311,49 +290,24 @@ export async function analyzeTenderUploadAction(input: {
     warnings.push("נתוני השוק והאגרות אינם זמינים כרגע");
   }
 
-  // 5. Secondary economic estimate (data-first: skipped quietly when inputs are thin).
-  let estimate: QuickAnalyzeResult | null = null;
+  // 5. Multi-layer AI intelligence: plan curation → underwriting assumptions →
+  //    typology-aware economic estimate → critic review + min-price comparison.
+  let cities: Awaited<ReturnType<typeof getCities>> = [];
   try {
-    const hasGeometry = tender.plotAreaSqm && tender.far;
-    if (tender.city && (tender.units || hasGeometry)) {
-      const far = tender.far ?? 3.0;
-      const units = Math.max(8, Math.round(tender.units ?? 0));
-      const plotAreaSqm =
-        tender.plotAreaSqm && tender.plotAreaSqm > 0
-          ? tender.plotAreaSqm
-          : derivePlotForUnits(units, far);
-      const cities = await getCities();
-      const avgPrice = market?.avgPricePerSqm ?? 26000;
-      const inputs = buildInputsFromTemplate({
-        track: "RMI",
-        city: tender.city,
-        plotAreaSqm,
-        far,
-        avgPricePerSqm: avgPrice,
-      });
-      if (tender.developmentCost && tender.developmentCost > 0) {
-        inputs.developmentCostsRMI = tender.developmentCost;
-      }
-      const analysis = analyzeProject({ inputs, city: tender.city }, cities, { runs: 4000 });
-      estimate = {
-        recommendedBid: analysis.recommendation.recommendedBid,
-        expectedProfit: analysis.bidEvaluation.profit,
-        marginOnCost: analysis.bidEvaluation.marginOnCost,
-        probabilityOfLoss: analysis.monteCarlo.probabilityOfLoss,
-        verdict: analysis.verdict,
-        verdictReason: analysis.verdictReason,
-        revenue: analysis.bidEvaluation.totalCost + analysis.bidEvaluation.profit,
-        totalCost: analysis.bidEvaluation.totalCost,
-        plotAreaSqm,
-        units: tender.units ?? Math.max(8, Math.round(((plotAreaSqm * far * 0.82) - plotAreaSqm * 0.12) / 92)),
-      };
-    } else {
-      warnings.push("אין מספיק נתונים לאומדן כלכלי (חסרים יח״ד או שטח מגרש ואחוזי בניה)");
-    }
+    cities = await getCities();
   } catch (e) {
-    console.error("tender estimate failed:", e);
-    warnings.push("האומדן הכלכלי אינו זמין כרגע (בדקו את חיבור מסד הנתונים)");
+    console.error("cities load failed:", e);
+    warnings.push("נתוני הערים אינם זמינים — האומדן משתמש בברירות מחדל ארציות");
   }
+  const intelligence = await buildTenderIntelligence({
+    tender,
+    plans,
+    location,
+    market,
+    cities,
+    runs: 4000,
+  });
+  warnings.push(...intelligence.warnings);
 
   // Burn the anonymous trial only after a report was actually produced.
   if (!session) {
@@ -365,7 +319,21 @@ export async function analyzeTenderUploadAction(input: {
     });
   }
 
-  return { report: { tender, plans, location, market, estimate, warnings } };
+  return {
+    report: {
+      tender,
+      plans,
+      planCuration: intelligence.planCuration,
+      location,
+      market,
+      assumptions: intelligence.assumptions,
+      estimate: intelligence.estimate,
+      review: intelligence.review,
+      minPriceComparison: intelligence.minPriceComparison,
+      analyst: intelligence.analyst,
+      warnings,
+    },
+  };
 }
 
 /** Add/remove a tender from the signed-in user's watchlist (favorites). */

@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, FileText, Sparkles, X, Paperclip } from "lucide-react";
+import { FileText, Sparkles, X, Paperclip } from "lucide-react";
 import { analyzeTenderUploadAction, type TenderReportDTO } from "@/server/actions";
+import { AnalysisProgress } from "./analysis-progress";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,8 @@ export function TenderUploader({
     });
   };
 
+  if (pending) return <AnalysisProgress />;
+
   return (
     <div className="space-y-3">
       <div className="space-y-2">
@@ -112,14 +115,9 @@ export function TenderUploader({
       {error && <p className="rounded-[var(--radius-sm)] bg-danger/12 px-3 py-2 text-sm text-danger">{error}</p>}
 
       <Button size="lg" className="w-full gap-2" disabled={!canRun} onClick={run}>
-        {pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-        {pending ? "מנתח את המכרז…" : "נתחו את המכרז"}
+        <Sparkles className="size-4" />
+        נתחו את המכרז
       </Button>
-      {pending && (
-        <p className="text-center text-xs text-muted-foreground">
-          מחלץ נתונים, שולף תב״ע ממנהל התכנון ומאתר את המגרש — עד חצי דקה
-        </p>
-      )}
     </div>
   );
 }

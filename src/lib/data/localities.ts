@@ -90,6 +90,14 @@ function normalizeName(name: string): string {
 /** Tight normalization matching scripts/gen-localities.ts (strips quotes/hyphens/all spaces). */
 const normTight = (s: string) => s.replace(/["'`׳״\-\s]/g, "");
 
+/**
+ * Ktiv male ↔ ktiv haser: CBS spells "קריית/הרצלייה/נהרייה" (double yod) while
+ * tender booklets usually write "קרית/הרצליה/נהריה". Collapsing double-yod on
+ * both sides makes the lookup spelling-agnostic. Built lazily once.
+ */
+const collapseYod = (s: string) => normTight(s).replace(/יי/g, "י");
+let COLLAPSED_BY_NAME: Record<string, [number, number]> | null = null;
+
 const NORMALIZED: Record<string, [number, number]> = Object.fromEntries(
   Object.entries(LOCALITIES).map(([k, v]) => [normalizeName(k), v]),
 );
@@ -111,6 +119,14 @@ export function geocodeCity(
   if (!city) return null;
   const key = normalizeName(city);
   let hit = NORMALIZED[key] || CBS_BY_NAME[normTight(city)];
+  if (!hit) {
+    if (!COLLAPSED_BY_NAME) {
+      COLLAPSED_BY_NAME = Object.fromEntries(
+        Object.entries(CBS_BY_NAME).map(([k, v]) => [k.replace(/יי/g, "י"), v]),
+      );
+    }
+    hit = COLLAPSED_BY_NAME[collapseYod(city)];
+  }
   if (!hit) {
     const found = Object.keys(NORMALIZED).find((k) => k.includes(key) || key.includes(k));
     if (found) hit = NORMALIZED[found];

@@ -6,7 +6,7 @@ import { LogOut } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { ViewModeToggle } from "@/components/layout/view-mode-toggle";
+import { ViewModeSwitcher } from "@/components/layout/view-mode-toggle";
 import type { SessionUser } from "@/server/auth";
 import { logoutAction } from "@/server/actions";
 
@@ -20,7 +20,7 @@ export function LeanShell({ user, children }: { user: SessionUser | null; childr
             <Logo />
           </Link>
           <div className="flex items-center gap-2">
-            <ViewModeToggle target="full" />
+            <ViewModeSwitcher current="lean" />
             <ThemeToggle />
             {user ? (
               <div className="flex items-center gap-2">

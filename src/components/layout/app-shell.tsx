@@ -12,7 +12,7 @@ import {
 } from "@/components/brand/icons";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
-import { ViewModeToggle } from "./view-mode-toggle";
+import { ViewModeSwitcher } from "./view-mode-toggle";
 import { CommandPalette } from "./command-palette";
 import { AssistantWidget } from "@/components/ai/assistant-widget";
 import type { SessionUser } from "@/server/auth";
@@ -145,7 +145,7 @@ export function AppShell({
               <Button variant="ghost" size="icon" className="lg:hidden" aria-label="חיפוש" onClick={openCommand}>
                 <SearchIcon className="text-foreground" />
               </Button>
-              <ViewModeToggle target="lean" className="ml-1 hidden sm:inline-flex" />
+              <ViewModeSwitcher current="full" className="ml-1 hidden sm:inline-flex" />
               <ThemeToggle />
               {user ? (
                 <Button asChild variant="outline" size="sm" className="gap-2 lg:hidden">

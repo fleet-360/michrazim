@@ -62,19 +62,15 @@ export function ResultsTable({ job, onJobUpdated }: { job: CustomJobDTO; onJobUp
   const download = async () => {
     setDownloading(true);
     setError("");
-    const res = await fillExcelAction(job.id);
+    // The action persists the filled workbook and returns its id; the bytes are
+    // streamed via a route handler (server-action responses are size-capped on Vercel).
+    const res = await fillExcelAction(job.id).catch(() => ({ error: "השרת דחה את הבקשה — נסו שוב" as const }));
     if ("error" in res) setError(res.error);
-    else if ("base64" in res) {
-      const bytes = Uint8Array.from(atob(res.base64), (c) => c.charCodeAt(0));
-      const blob = new Blob([bytes], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      const url = URL.createObjectURL(blob);
+    else if ("fileId" in res) {
       const a = document.createElement("a");
-      a.href = url;
+      a.href = `/api/custom/files/${res.fileId}`;
       a.download = res.filename;
       a.click();
-      URL.revokeObjectURL(url);
       setDownloadInfo({ filled: res.filled, skipped: res.skipped.length });
       onJobUpdated?.();
     }

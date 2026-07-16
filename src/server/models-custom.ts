@@ -30,6 +30,26 @@ const CustomFileSchema = new Schema(
   { timestamps: true },
 );
 
+/**
+ * Chunked-upload staging: Vercel caps a single request body at ~4.5MB
+ * (FUNCTION_PAYLOAD_TOO_LARGE), so files >~3MB are sent in ordered chunks
+ * that are appended here, then finalized into a CustomFile.
+ */
+const CustomUploadSchema = new Schema(
+  {
+    jobId: { type: Schema.Types.ObjectId, ref: "CustomJob", index: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    kind: { type: String, enum: ["excel", "document"], required: true },
+    filename: { type: String, required: true },
+    mimeType: { type: String, required: true },
+    declaredSizeBytes: { type: Number, required: true },
+    totalChunks: { type: Number, required: true },
+    received: { type: Number, default: 0 },
+    data: { type: Buffer, default: Buffer.alloc(0) },
+  },
+  { timestamps: true },
+);
+
 /* ------------------------------------------------------------------ */
 /* Field specs — embedded in templates                                  */
 /* ------------------------------------------------------------------ */
@@ -176,6 +196,7 @@ export type CustomEvidenceDoc = InferSchemaType<typeof CustomEvidenceSchema> & {
 };
 
 export const CustomFile = models.CustomFile || model("CustomFile", CustomFileSchema);
+export const CustomUpload = models.CustomUpload || model("CustomUpload", CustomUploadSchema);
 export const ExcelTemplate = models.ExcelTemplate || model("ExcelTemplate", ExcelTemplateSchema);
 export const CustomJob = models.CustomJob || model("CustomJob", CustomJobSchema);
 export const CustomEvidence = models.CustomEvidence || model("CustomEvidence", CustomEvidenceSchema);

@@ -10,7 +10,7 @@ import mongoose from "mongoose";
 import ExcelJS from "exceljs";
 import { connectDB } from "./db";
 import { getSession } from "./auth";
-import { CustomFile, CustomJob, CustomEvidence, ExcelTemplate } from "./models-custom";
+import { CustomFile, CustomJob, CustomEvidence, CustomUpload, ExcelTemplate } from "./models-custom";
 import {
   serializeWorkbookForAI,
   validateFieldSpecs,
@@ -269,6 +269,112 @@ export async function uploadCustomFileAction(input: {
 }
 
 /* ------------------------------------------------------------------ */
+/* Chunked upload — Vercel caps any single request at ~4.5MB            */
+/* (FUNCTION_PAYLOAD_TOO_LARGE), so big files arrive in ordered parts.  */
+/* ------------------------------------------------------------------ */
+
+/** Max base64 chars per chunk request (~2.2MB binary, well under 4.5MB). */
+export async function beginUploadAction(input: {
+  jobId: string;
+  filename: string;
+  mimeType: string;
+  kind: "excel" | "document";
+  sizeBytes: number;
+  totalChunks: number;
+}): Promise<{ uploadId: string } | AuthFail | Err> {
+  const owned = await ownedJob(input.jobId);
+  if (owned.fail) return owned.fail;
+  if (!Number.isInteger(input.totalChunks) || input.totalChunks < 1 || input.totalChunks > 8) {
+    return { error: "מספר מקטעים לא תקין" };
+  }
+  if (!Number.isFinite(input.sizeBytes) || input.sizeBytes <= 0 || input.sizeBytes > MAX_FILE_BYTES) {
+    return { error: "הקובץ גדול מדי — עד 8MB" };
+  }
+  try {
+    // Drop stale staging docs for this job (abandoned uploads).
+    await CustomUpload.deleteMany({ jobId: owned.job._id, filename: input.filename });
+    const up = await CustomUpload.create({
+      jobId: owned.job._id,
+      userId: owned.session.id,
+      kind: input.kind,
+      filename: (input.filename || "file").slice(0, 200),
+      mimeType: input.mimeType,
+      declaredSizeBytes: input.sizeBytes,
+      totalChunks: input.totalChunks,
+      received: 0,
+      data: Buffer.alloc(0),
+    });
+    return { uploadId: String(up._id) };
+  } catch (e) {
+    console.error("beginUploadAction failed:", e);
+    return { error: "פתיחת ההעלאה נכשלה" };
+  }
+}
+
+export async function uploadChunkAction(input: {
+  uploadId: string;
+  index: number;
+  base64: string;
+}): Promise<{ received: number } | AuthFail | Err> {
+  const session = await getSession();
+  if (!session) return { requireAuth: true };
+  if (!mongoose.isValidObjectId(input.uploadId)) return { error: "העלאה לא נמצאה" };
+  if (input.base64.length > 3_400_000) return { error: "מקטע גדול מדי" };
+  try {
+    await connectDB();
+    const up = await CustomUpload.findById(input.uploadId);
+    if (!up || String(up.userId) !== session.id) return { error: "העלאה לא נמצאה" };
+    if (input.index !== up.received) return { error: `מקטע שלא בתורו (צפוי ${up.received})` };
+    const bytes = Buffer.from(input.base64, "base64");
+    if (up.data.length + bytes.length > MAX_FILE_BYTES) return { error: "הקובץ גדול מדי — עד 8MB" };
+    up.data = Buffer.concat([up.data, bytes]);
+    up.received += 1;
+    await up.save();
+    return { received: up.received };
+  } catch (e) {
+    console.error("uploadChunkAction failed:", e);
+    return { error: "העלאת מקטע נכשלה — נסו שוב" };
+  }
+}
+
+export async function finishUploadAction(
+  uploadId: string,
+): Promise<{ fileId: string; sizeKb: number } | AuthFail | Err> {
+  const session = await getSession();
+  if (!session) return { requireAuth: true };
+  if (!mongoose.isValidObjectId(uploadId)) return { error: "העלאה לא נמצאה" };
+  try {
+    await connectDB();
+    const up = await CustomUpload.findById(uploadId);
+    if (!up || String(up.userId) !== session.id) return { error: "העלאה לא נמצאה" };
+    if (up.received !== up.totalChunks) return { error: "חסרים מקטעים — ההעלאה לא הושלמה" };
+    const bytes: Buffer = up.data;
+    const mime = sniffMime(bytes, up.mimeType);
+    if (!mime) {
+      await CustomUpload.deleteOne({ _id: up._id });
+      return { error: "סוג קובץ לא נתמך (PDF, PNG/JPG או xlsx)" };
+    }
+    if (up.kind === "excel" && !mime.includes("sheet")) return { error: "קובץ התבנית חייב להיות xlsx" };
+    if (up.kind === "document" && mime.includes("sheet")) return { error: "מסמכים נתמכים: PDF או תמונה" };
+    if (up.kind === "excel") await CustomFile.deleteMany({ jobId: up.jobId, kind: "excel" });
+    const file = await CustomFile.create({
+      jobId: up.jobId,
+      userId: session.id,
+      kind: up.kind,
+      filename: up.filename,
+      mimeType: mime,
+      sizeBytes: bytes.length,
+      data: bytes,
+    });
+    await CustomUpload.deleteOne({ _id: up._id });
+    return { fileId: String(file._id), sizeKb: Math.round(bytes.length / 1024) };
+  } catch (e) {
+    console.error("finishUploadAction failed:", e);
+    return { error: "סגירת ההעלאה נכשלה" };
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Phase A — Excel structure analysis                                   */
 /* ------------------------------------------------------------------ */
 
@@ -447,12 +553,25 @@ export async function extractEvidenceAction(
     const block = fileContentBlock(file.mimeType, file.data.toString("base64"));
     if (!block) return { error: "סוג קובץ לא נתמך" };
     const docType = (file.classification?.docType ?? "other") as DocType;
+    // Focus the extraction on THIS job's asset (critical for plan documents
+    // that tabulate many parcels — we want our parcel's row, not plan totals).
+    const idn = (owned.job.identity ?? {}) as Record<string, string>;
+    const focusHint = [
+      owned.job.name,
+      idn.city && `עיר ${idn.city}`,
+      idn.gush && `גוש ${idn.gush}`,
+      idn.helka && `חלקה ${idn.helka}`,
+      idn.planNumber && `תכנית ${idn.planNumber}`,
+    ]
+      .filter(Boolean)
+      .join(", ");
     const candidates = await extractDomainEvidence({
       block,
       docType,
       filename: file.filename,
       domain,
       fields,
+      focusHint: focusHint || undefined,
     });
 
     await CustomEvidence.findOneAndUpdate(
@@ -724,7 +843,7 @@ export async function updateFinalValueAction(
 export async function fillExcelAction(
   jobId: string,
 ): Promise<
-  { base64: string; filename: string; filled: number; skipped: { cellRef: string; reason: string }[] } | AuthFail | Err
+  { fileId: string; filename: string; filled: number; skipped: { cellRef: string; reason: string }[] } | AuthFail | Err
 > {
   const owned = await ownedJob(jobId);
   if (owned.fail) return owned.fail;
@@ -769,7 +888,9 @@ export async function fillExcelAction(
     owned.job.markModified("results");
     await owned.job.save();
 
-    return { base64: buffer.toString("base64"), filename: outName, filled: filled.length, skipped };
+    // The bytes are NOT returned through the action (Vercel caps responses at
+    // ~4.5MB) — the client downloads via /api/custom/files/[id].
+    return { fileId: String(resultFile._id), filename: outName, filled: filled.length, skipped };
   } catch (e) {
     console.error("fillExcelAction failed:", e);
     return { error: "מילוי האקסל נכשל" };

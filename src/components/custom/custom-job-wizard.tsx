@@ -6,6 +6,9 @@ import { Loader2, Sparkles, Map as MapIcon, ArrowLeft, X } from "lucide-react";
 import {
   createCustomJobAction,
   uploadCustomFileAction,
+  beginUploadAction,
+  uploadChunkAction,
+  finishUploadAction,
   analyzeExcelAction,
   confirmFieldsAction,
   classifyDocumentAction,
@@ -57,6 +60,52 @@ async function pool<T>(tasks: (() => Promise<T>)[], limit = 3): Promise<T[]> {
   return results;
 }
 
+/**
+ * A thrown server-action error (network drop, platform 413, timeout) must
+ * become a visible error object — never a frozen loader.
+ */
+async function safe<T>(p: Promise<T>): Promise<T | { error: string }> {
+  try {
+    return await p;
+  } catch {
+    return { error: "השרת דחה את הבקשה — בדקו את החיבור ונסו שוב" };
+  }
+}
+
+/** Base64 chars per request — keeps every call well under Vercel's ~4.5MB cap. */
+const CHUNK_B64 = 2_800_000;
+
+/** Upload one file: single-shot when small, ordered chunks when big. */
+async function uploadFileSmart(
+  jobId: string,
+  f: { name: string; mime: string; kind: "excel" | "document"; base64: string },
+  onProgress?: (msg: string) => void,
+): Promise<{ fileId: string } | { error: string }> {
+  if (f.base64.length <= CHUNK_B64) {
+    const res = await safe(
+      uploadCustomFileAction({ jobId, filename: f.name, mimeType: f.mime, kind: f.kind, base64: f.base64 }),
+    );
+    if ("fileId" in res) return { fileId: res.fileId };
+    return { error: "error" in res ? res.error : "ההעלאה נכשלה" };
+  }
+  // Chunked path (Vercel FUNCTION_PAYLOAD_TOO_LARGE guard).
+  const totalChunks = Math.ceil(f.base64.length / CHUNK_B64);
+  const sizeBytes = Math.floor(f.base64.length * 0.75);
+  const begun = await safe(
+    beginUploadAction({ jobId, filename: f.name, mimeType: f.mime, kind: f.kind, sizeBytes, totalChunks }),
+  );
+  if (!("uploadId" in begun)) return { error: "error" in begun ? begun.error : "פתיחת ההעלאה נכשלה" };
+  for (let i = 0; i < totalChunks; i++) {
+    onProgress?.(`מעלה את "${f.name}" — מקטע ${i + 1}/${totalChunks}`);
+    const part = f.base64.slice(i * CHUNK_B64, (i + 1) * CHUNK_B64);
+    const res = await safe(uploadChunkAction({ uploadId: begun.uploadId, index: i, base64: part }));
+    if (!("received" in res)) return { error: "error" in res ? res.error : `מקטע ${i + 1} נכשל` };
+  }
+  const fin = await safe(finishUploadAction(begun.uploadId));
+  if ("fileId" in fin) return { fileId: fin.fileId };
+  return { error: "error" in fin ? fin.error : "סגירת ההעלאה נכשלה" };
+}
+
 let eventSeq = 0;
 
 export function CustomJobWizard() {
@@ -96,7 +145,9 @@ export function CustomJobWizard() {
     ]);
     setEvents([]);
 
-    const created = await createCustomJobAction(jobName || excel?.name.replace(/\.xlsx$/i, "") || "ניתוח חדש");
+    const created = await safe(
+      createCustomJobAction(jobName || excel?.name.replace(/\.xlsx$/i, "") || "ניתוח חדש"),
+    );
     if (!("jobId" in created)) {
       setFatal("error" in created ? created.error : "נדרשת התחברות");
       setPhase("error");
@@ -104,29 +155,23 @@ export function CustomJobWizard() {
     }
     setJobId(created.jobId);
 
-    // Upload files one action per file (12MB body limit discipline).
+    // Upload files — chunked automatically when big (Vercel ~4.5MB request cap).
     let uploaded = 0;
     const results = await pool(
       files.map((f) => async () => {
         setFiles((prev) => prev.map((p) => (p.localId === f.localId ? { ...p, status: "uploading" } : p)));
-        const res = await uploadCustomFileAction({
-          jobId: created.jobId,
-          filename: f.name,
-          mimeType: f.mime,
-          kind: f.kind,
-          base64: f.base64,
-        });
+        const res = await uploadFileSmart(created.jobId, f, (msg) => emit(msg));
         const ok = "fileId" in res;
         setFiles((prev) =>
           prev.map((p) =>
             p.localId === f.localId
-              ? { ...p, status: ok ? "uploaded" : "error", fileId: ok ? res.fileId : undefined, error: ok ? undefined : ("error" in res ? res.error : "שגיאה") }
+              ? { ...p, status: ok ? "uploaded" : "error", fileId: ok ? res.fileId : undefined, error: ok ? undefined : res.error }
               : p,
           ),
         );
         uploaded++;
         patchStep("upload", { done: uploaded });
-        emit(ok ? `הועלה: ${f.name}` : `העלאה נכשלה: ${f.name}`, ok ? "info" : "warn");
+        emit(ok ? `הועלה: ${f.name}` : `העלאה נכשלה: ${f.name} — ${"error" in res ? res.error : ""}`, ok ? "info" : "warn");
         return ok ? { localId: f.localId, fileId: (res as { fileId: string }).fileId, kind: f.kind } : null;
       }),
       2,
@@ -142,7 +187,7 @@ export function CustomJobWizard() {
     // Analyze the Excel structure (the one long call — honest label).
     patchStep("excel", { state: "active" });
     emit("קורא את הגיליונות ומזהה מה חשוב לכם לחלץ מהמכרזים…");
-    const analyzed = await analyzeExcelAction(created.jobId);
+    const analyzed = await safe(analyzeExcelAction(created.jobId));
     if (!("fields" in analyzed)) {
       setFatal("error" in analyzed ? analyzed.error : "ניתוח האקסל נכשל");
       setPhase("error");
@@ -159,10 +204,10 @@ export function CustomJobWizard() {
   const runPipeline = async (edits: FieldEdit[]) => {
     if (!jobId) return;
     setConfirmPending(true);
-    const confirmed = await confirmFieldsAction(
+    const confirmed = await safe(confirmFieldsAction(
       jobId,
       edits.map((e) => ({ key: e.key, label: e.label, enabled: e.enabled })),
-    );
+    ));
     setConfirmPending(false);
     if (!("activeFields" in confirmed)) {
       setFatal("error" in confirmed ? confirmed.error : "שמירת השדות נכשלה");
@@ -188,7 +233,7 @@ export function CustomJobWizard() {
     await pool(
       uploadedDocs.map((f) => async () => {
         emit(`מסווג את "${f.name}"…`);
-        const res = await classifyDocumentAction(jobId, f.fileId!);
+        const res = await safe(classifyDocumentAction(jobId, f.fileId!));
         classified++;
         patchStep("classify", { done: classified });
         if ("docType" in res) {
@@ -217,7 +262,7 @@ export function CustomJobWizard() {
     // doc-major order (the workplan is already grouped per file) maximizes prompt-cache hits.
     await pool(
       workplan.map((u) => async () => {
-        const res = await extractEvidenceAction(jobId, u.fileId, u.domain);
+        const res = await safe(extractEvidenceAction(jobId, u.fileId, u.domain));
         extracted++;
         patchStep("extract", { done: extracted });
         if ("found" in res) {
@@ -233,7 +278,7 @@ export function CustomJobWizard() {
     // E. locate + enrichment offer.
     patchStep("locate", { state: "active" });
     emit("מצליב זהות מהראיות ומאתר את המגרש ב-GIS…");
-    const located = await locateJobAction(jobId);
+    const located = await safe(locateJobAction(jobId));
     patchStep("locate", { state: "done" });
     if ("identity" in located) {
       const idn = located.identity;
@@ -263,7 +308,7 @@ export function CustomJobWizard() {
     ]);
 
     if (withTva) {
-      const enr = await fetchTvaEnrichmentAction(jobId);
+      const enr = await safe(fetchTvaEnrichmentAction(jobId));
       if ("plansFound" in enr) {
         emit(`נמצאו ${enr.plansFound} תכניות · ${enr.mapped} ערכים מופו לשדות שלכם`);
       } else {
@@ -275,7 +320,7 @@ export function CustomJobWizard() {
 
     let done = 0;
     for (const domain of enabledDomains) {
-      const res = await reconcileDomainAction(jobId, domain);
+      const res = await safe(reconcileDomainAction(jobId, domain));
       done++;
       patchStep("reconcile", { done });
       if ("finalized" in res) {
@@ -287,7 +332,7 @@ export function CustomJobWizard() {
     }
     patchStep("reconcile", { state: "done" });
 
-    const final = await getCustomJobAction(jobId);
+    const final = await safe(getCustomJobAction(jobId));
     if ("job" in final) {
       setJob(final.job);
       setPhase("results");
@@ -300,7 +345,7 @@ export function CustomJobWizard() {
 
   const refreshJob = async () => {
     if (!jobId) return;
-    const res = await getCustomJobAction(jobId);
+    const res = await safe(getCustomJobAction(jobId));
     if ("job" in res) setJob(res.job);
   };
 

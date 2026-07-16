@@ -38,6 +38,10 @@ export function ResultsTable({ job, onJobUpdated }: { job: CustomJobDTO; onJobUp
     return !r || r.value === null || r.value === "";
   });
   const conflicts = job.results.filter((r) => r.conflict).length;
+  const sourceCount = new Set(
+    job.results.filter((r) => r.sourceName).map((r) => r.sourceName),
+  ).size;
+  const highConf = job.results.filter((r) => r.confidence === "high").length;
 
   const saveEdit = async (fieldKey: string) => {
     setSavingKey(fieldKey);
@@ -99,6 +103,24 @@ export function ResultsTable({ job, onJobUpdated }: { job: CustomJobDTO; onJobUp
             {downloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
             הורדת האקסל הממולא
           </Button>
+        </div>
+
+        {/* summary chips */}
+        <div className="mb-4 flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full bg-primary/10 px-2.5 py-1 font-semibold text-primary tnum">
+            {job.results.length}/{enabledFields.length} שדות מולאו
+          </span>
+          <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground tnum">
+            {sourceCount} מקורות שונים
+          </span>
+          <span className="rounded-full bg-success/10 px-2.5 py-1 text-success tnum">
+            {highConf} בביטחון גבוה
+          </span>
+          {conflicts > 0 && (
+            <span className="rounded-full bg-warning/10 px-2.5 py-1 text-warning-foreground tnum dark:text-amber-300">
+              {conflicts} סתירות לבדיקה
+            </span>
+          )}
         </div>
 
         {downloadInfo && (

@@ -14,12 +14,20 @@ import type { SheetGrid, FieldSpec, FieldDomain, FieldDataType } from "@/lib/exc
 function extractJson<T>(out: string | null, open: "{" | "["): T | null {
   if (!out) return null;
   const close = open === "{" ? "}" : "]";
+  const json = out.slice(out.indexOf(open), out.lastIndexOf(close) + 1);
   try {
-    const json = out.slice(out.indexOf(open), out.lastIndexOf(close) + 1);
     return JSON.parse(json) as T;
   } catch {
-    console.error("[custom-layers] JSON parse failed, raw head:", out.slice(0, 200));
-    return null;
+    // Hebrew abbreviations (מע"מ, יח"ד, תב"ע) leak unescaped double-quotes into
+    // JSON strings. A quote flanked by Hebrew letters is never valid JSON
+    // structure — escape it and retry before giving up.
+    try {
+      const repaired = json.replace(/([֐-׿])"([֐-׿])/g, '$1\\"$2');
+      return JSON.parse(repaired) as T;
+    } catch {
+      console.error("[custom-layers] JSON parse failed, raw head:", out.slice(0, 200));
+      return null;
+    }
   }
 }
 
@@ -177,8 +185,10 @@ const DOMAIN_LABELS: Record<FieldDomain, string> = {
 
 const EXTRACT_SYSTEM = `אתה מחלץ נתונים ממסמך נדל"ן ישראלי עבור רשימת שדות מוגדרת. כללים מחייבים:
 - חלץ ערכים אך ורק לשדות שברשימה. אם שדה לא מופיע במסמך — השמט אותו לגמרי. אסור לנחש ואסור להשלים מהידע הכללי שלך.
-- לכל ערך: rawQuote = ציטוט מדויק וקצר מהמסמך (עד 25 מילים) שמוכיח את הערך, page אם ניתן לזהות.
+- לכל ערך: rawQuote = ציטוט מדויק וקצר מהמסמך (עד 25 מילים) שמוכיח את הערך, page אם ניתן לזהות. בתוך הציטוט השתמש בגרשיים עבריים ״ (לא ") כדי לא לשבור את ה-JSON — למשל מע״מ, יח״ד.
 - מספרים כמספרים נקיים (בלי פסיקים/₪). תאריכים בפורמט YYYY-MM-DD.
+- זהירות משדות דומים — אל תערבב: "מספר מגרש" הוא מזהה (למשל מגרש 130) ואילו "שטח מגרש" הוא מ"ר; "שומה"/"מחיר מינימום" אינם "הצעה זוכה"; "גוש" אינו "חלקה". במשפט כמו "מגרש 130 בשטח 320 מ"ר" — מספר המגרש הוא 130 והשטח הוא 320.
+- בדיקת יחידה: ודא שהערך מתאים ליחידת השדה (מ"ר / ₪ / יח"ד / תאריך / %). אם הערך שמצאת לא ביחידה הנכונה — אל תחזיר אותו.
 - confidence: high רק כשהערך מופיע במפורש; medium כשנדרשת פרשנות קלה; low כשעקיף.
 החזר JSON תקין בלבד.`;
 

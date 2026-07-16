@@ -44,8 +44,15 @@ function coerce(
     }
     case "date": {
       if ((value as unknown) instanceof Date) return value as unknown as Date;
-      const d = new Date(String(value));
-      return isNaN(d.getTime()) ? String(value) : d;
+      const s = String(value).trim();
+      // Israeli documents write DD/MM/YYYY — JS Date parses that as US month-first.
+      const ddmm = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec(s);
+      if (ddmm) {
+        const d = new Date(Date.UTC(Number(ddmm[3]), Number(ddmm[2]) - 1, Number(ddmm[1])));
+        if (!isNaN(d.getTime())) return d;
+      }
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? s : d;
     }
     case "boolean":
       if (typeof value === "boolean") return value;

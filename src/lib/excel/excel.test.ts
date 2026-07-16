@@ -166,4 +166,18 @@ describe("fillWorkbook", () => {
     const costs = round.getWorksheet("עלויות")!;
     expect(costs.getCell("B2").value).toBeInstanceOf(Date);
   });
+
+  it("parses Israeli DD/MM/YYYY dates correctly (not US month-first)", async () => {
+    const wb = await buildFixture();
+    const original = Buffer.from(await wb.xlsx.writeBuffer());
+    const { buffer } = await fillWorkbook(original, [
+      { sheet: "עלויות", cellRef: "B2", value: "26/08/2024", dataType: "date" },
+    ]);
+    const round = new ExcelJS.Workbook();
+    await round.xlsx.load(buffer as unknown as ExcelJS.Buffer);
+    const v = round.getWorksheet("עלויות")!.getCell("B2").value as Date;
+    expect(v).toBeInstanceOf(Date);
+    expect(v.getUTCMonth()).toBe(7); // August, not month-26 garbage
+    expect(v.getUTCDate()).toBe(26);
+  });
 });

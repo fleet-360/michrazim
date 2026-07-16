@@ -19,12 +19,19 @@ import type { PlanInfo } from "@/lib/data/iplan";
 function extractJson<T>(out: string | null, open: "{" | "["): T | null {
   if (!out) return null;
   const close = open === "{" ? "}" : "]";
+  const json = out.slice(out.indexOf(open), out.lastIndexOf(close) + 1);
   try {
-    const json = out.slice(out.indexOf(open), out.lastIndexOf(close) + 1);
     return JSON.parse(json) as T;
   } catch {
-    console.error("[ai-layers] JSON parse failed, raw head:", out.slice(0, 220));
-    return null;
+    // Hebrew abbreviations (מע"מ, יח"ד, תב"ע) leak unescaped quotes into JSON
+    // strings; a quote flanked by Hebrew letters is never JSON structure.
+    try {
+      const repaired = json.replace(/([֐-׿])"([֐-׿])/g, '$1\\"$2');
+      return JSON.parse(repaired) as T;
+    } catch {
+      console.error("[ai-layers] JSON parse failed, raw head:", out.slice(0, 220));
+      return null;
+    }
   }
 }
 

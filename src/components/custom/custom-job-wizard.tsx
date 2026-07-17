@@ -15,6 +15,7 @@ import {
   extractEvidenceAction,
   locateJobAction,
   fetchTvaEnrichmentAction,
+  fetchDealEnrichmentAction,
   reconcileDomainAction,
   getCustomJobAction,
   type FieldSpecDTO,
@@ -120,6 +121,7 @@ export function CustomJobWizard() {
   const [steps, setSteps] = React.useState<ProgressStep[]>([]);
   const [job, setJob] = React.useState<CustomJobDTO | null>(null);
   const [identityLine, setIdentityLine] = React.useState("");
+  const [wantDeals, setWantDeals] = React.useState(true);
   const [fatal, setFatal] = React.useState("");
   const [confirmPending, setConfirmPending] = React.useState(false);
 
@@ -293,18 +295,19 @@ export function CustomJobWizard() {
       }
       emit("המגרש לא אותר במפה — ממשיכים בלי העשרת תב\"ע", "warn");
     }
-    await finish(false, domains);
+    await finish(false, false, domains);
   };
 
   /* ---------------- Phase: enrichment (optional) + reconcile ---------------- */
-  const finish = async (withTva: boolean, domainsArg?: FieldDomain[]) => {
+  const finish = async (withTva: boolean, withDeals = false, domainsArg?: FieldDomain[]) => {
     if (!jobId) return;
     const enabledDomains =
       domainsArg ?? ([...new Set(fields.filter((f) => f.enabled).map((f) => f.domain))] as FieldDomain[]);
     setPhase("finishing");
     setSteps([
       ...(withTva ? [{ key: "tva", label: 'מייבא תב״ע חיה ממנהל התכנון', state: "active" as const }] : []),
-      { key: "reconcile", label: "מיישב סתירות וקובע ערכים סופיים", state: withTva ? "pending" : "active", done: 0, total: enabledDomains.length },
+      ...(withDeals ? [{ key: "deals", label: "מאתר עסקאות אמת באזור (סוכן ניווט — כמה דקות)", state: withTva ? ("pending" as const) : ("active" as const) }] : []),
+      { key: "reconcile", label: "מיישב סתירות וקובע ערכים סופיים", state: withTva || withDeals ? "pending" : "active", done: 0, total: enabledDomains.length },
     ]);
 
     if (withTva) {
@@ -315,6 +318,18 @@ export function CustomJobWizard() {
         emit("ייבוא התב\"ע נכשל — ממשיכים בלעדיו", "warn");
       }
       patchStep("tva", { state: "done" });
+      patchStep(withDeals ? "deals" : "reconcile", { state: "active" });
+    }
+
+    if (withDeals) {
+      const dres = await safe(fetchDealEnrichmentAction(jobId));
+      if ("deals" in dres) {
+        emit(`אותרו ${dres.deals} עסקאות אמת מהאזור${dres.mapped ? ` · ${dres.mapped} ערכים מופו` : ""}`);
+        for (const w of dres.warnings ?? []) emit(w, "warn");
+      } else {
+        emit("איתור העסקאות נכשל — ממשיכים בלעדיו", "warn");
+      }
+      patchStep("deals", { state: "done" });
       patchStep("reconcile", { state: "active" });
     }
 
@@ -401,17 +416,33 @@ export function CustomJobWizard() {
             {identityLine && <p className="text-xs text-muted-foreground">{identityLine}</p>}
           </div>
         </div>
-        <p className="mb-4 text-sm text-muted-foreground">
+        <p className="mb-3 text-sm text-muted-foreground">
           נמשוך נתונים חיים ממנהל התכנון (יח״ד מאושרות, סטטוס תכנית, שטחים) ונשתמש בהם כמקור נוסף
           להצלבה מול המסמכים שלכם — מומלץ.
         </p>
+        <label className="mb-4 flex cursor-pointer items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 accent-[color:var(--primary)]"
+            checked={wantDeals}
+            onChange={(e) => setWantDeals(e.target.checked)}
+          />
+          <span className="text-sm">
+            <span className="font-semibold text-[#1E3A5F] dark:text-slate-100">
+              לאתר גם עסקאות אמת מהאזור
+            </span>{" "}
+            <span className="text-xs text-muted-foreground">
+              — סוכן AI ינווט באתרי נדל״ן (רשות המיסים, מדלן, govmap) ויביא עסקאות אמיתיות עם מקור וציטוט. מוסיף כמה דקות.
+            </span>
+          </span>
+        </label>
         <div className="flex gap-2">
-          <Button className="flex-1 gap-2" onClick={() => finish(true)}>
+          <Button className="flex-1 gap-2" onClick={() => finish(true, wantDeals)}>
             <ArrowLeft className="size-4" />
-            ייבוא תב״ע והמשך
+            ייבוא והמשך
           </Button>
-          <Button variant="outline" className="flex-1" onClick={() => finish(false)}>
-            דילוג — בלי תב״ע
+          <Button variant="outline" className="flex-1" onClick={() => finish(false, false)}>
+            דילוג — בלי העשרה
           </Button>
         </div>
       </div>

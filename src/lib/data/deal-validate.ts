@@ -1,0 +1,116 @@
+import type { EnrichSourceKind, FactCard, DealFact } from "@/lib/enrich/types";
+
+/**
+ * Shared deal provenance + anti-fabrication logic, used by every deal transport
+ * (nadlan direct/scraper JSON, and the Anthropic web agent). "The AI advises,
+ * real data rules" — a deal survives only with an allowlisted sourceUrl and a
+ * verbatim quote, and prices are only ever derived by arithmetic on real values.
+ */
+
+export const DEAL_SITES: { kind: EnrichSourceKind; host: string; label: string }[] = [
+  { kind: "nadlan", host: "nadlan.gov.il", label: "רשות המיסים (nadlan.gov.il)" },
+  { kind: "madlan", host: "madlan.co.il", label: "מדלן" },
+  { kind: "govmap", host: "govmap.gov.il", label: "govmap" },
+  { kind: "yad2", host: "yad2.co.il", label: "יד2" },
+];
+
+export const ALLOWED_HOSTS = [...DEAL_SITES.map((s) => s.host), "gov.il"];
+
+export function hostOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+export function hostAllowed(url: string): boolean {
+  const h = hostOf(url);
+  if (!h) return false;
+  return ALLOWED_HOSTS.some((allowed) => h === allowed || h.endsWith("." + allowed));
+}
+
+export function sourceForUrl(url: string): EnrichSourceKind {
+  const h = hostOf(url) ?? "";
+  const hit = DEAL_SITES.find((s) => h === s.host || h.endsWith("." + s.host));
+  return hit?.kind ?? "web";
+}
+
+export function num(v: unknown): number | undefined {
+  if (v === undefined || v === null || v === "") return undefined;
+  const x = typeof v === "string" ? Number(v.replace(/[,₪\s]/g, "")) : Number(v);
+  return Number.isFinite(x) && x > 0 ? x : undefined;
+}
+
+export function str(v: unknown): string | undefined {
+  if (v === undefined || v === null) return undefined;
+  const s = String(v).trim();
+  return s || undefined;
+}
+
+/** Raw deal shape a transport emits — DealFact fields + provenance. */
+export interface AgentDeal extends DealFact {
+  sourceUrl?: string;
+  quote?: string;
+}
+
+/**
+ * Deterministic anti-fabrication validator. Drops any deal lacking an
+ * allowlisted sourceUrl, a real quote (≥8 chars), or a price signal. Derives
+ * ₪/m² only from real fetched totalPrice/sizeSqm. Caps the result set.
+ */
+export function validateDeals(raw: AgentDeal[], fallbackUrls: string[] = []): FactCard[] {
+  const fetchedAt = new Date().toISOString();
+  const out: FactCard[] = [];
+  const seen = new Set<string>();
+  for (const d of raw.slice(0, 80)) {
+    if (!d) continue;
+    let sourceUrl = str(d.sourceUrl);
+    if (!sourceUrl || !hostAllowed(sourceUrl)) {
+      sourceUrl = fallbackUrls.find(hostAllowed);
+    }
+    if (!sourceUrl || !hostAllowed(sourceUrl)) continue;
+
+    const quote = str(d.quote);
+    if (!quote || quote.length < 8) continue;
+
+    const total = num(d.totalPrice);
+    const size = num(d.sizeSqm);
+    let pps = num(d.pricePerSqm);
+    if (!total && !pps) continue;
+    if (!pps && total && size) pps = Math.round(total / size);
+
+    // Dedup on a natural key.
+    const key = [d.gush, d.helka, d.dealDate, total, str(d.address)].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const deal: DealFact = {
+      address: str(d.address),
+      neighborhood: str(d.neighborhood),
+      city: str(d.city),
+      gush: str(d.gush),
+      helka: str(d.helka),
+      dealDate: str(d.dealDate),
+      totalPrice: total,
+      sizeSqm: size,
+      pricePerSqm: pps,
+      rooms: num(d.rooms),
+      floor: num(d.floor),
+      yearBuilt: num(d.yearBuilt),
+      assetType: str(d.assetType),
+    };
+    out.push({
+      taskId: "",
+      kind: "deal",
+      source: sourceForUrl(sourceUrl),
+      sourceUrl,
+      quote: quote.slice(0, 400),
+      fetchedAt,
+      confidence: "high",
+      deal,
+    });
+    if (out.length >= 40) break;
+  }
+  return out;
+}

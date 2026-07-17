@@ -130,9 +130,10 @@ const CustomJobSchema = new Schema(
           value: Schema.Types.Mixed,
           displayValue: String,
           source: {
-            kind: { type: String, enum: ["document", "xplan", "govmap", "user"] },
+            kind: { type: String, enum: ["document", "xplan", "govmap", "web", "user"] },
             fileId: { type: Schema.Types.ObjectId, ref: "CustomFile" },
             quote: String,
+            sourceUrl: String,
             page: Number,
           },
           confidence: { type: String, enum: ["high", "medium", "low"] },
@@ -158,7 +159,7 @@ const CustomEvidenceSchema = new Schema(
   {
     jobId: { type: Schema.Types.ObjectId, ref: "CustomJob", required: true, index: true },
     domain: { type: String, required: true },
-    sourceKind: { type: String, enum: ["document", "xplan"], required: true },
+    sourceKind: { type: String, enum: ["document", "xplan", "web"], required: true },
     fileId: { type: Schema.Types.ObjectId, ref: "CustomFile" },
     candidates: [
       new Schema(
@@ -166,6 +167,7 @@ const CustomEvidenceSchema = new Schema(
           fieldKey: { type: String, required: true },
           value: Schema.Types.Mixed,
           rawQuote: String,
+          sourceUrl: String,
           page: Number,
           confidence: { type: String, enum: ["high", "medium", "low"], default: "medium" },
         },

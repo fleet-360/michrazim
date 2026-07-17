@@ -32,6 +32,8 @@ import {
 import { fetchParcelByGushHelka, govmapGeocode } from "@/lib/data/govmap";
 import { fetchPlansAtPoint, fetchPlansByNumber, type PlanInfo } from "@/lib/data/iplan";
 import { geocodeCity } from "@/lib/data/localities";
+import { runEnrichment } from "@/lib/enrich";
+import { persistDealsToComparables, factsToEvidenceCandidates } from "@/lib/enrich/persist";
 
 /* ------------------------------------------------------------------ */
 /* DTOs                                                                 */
@@ -705,6 +707,88 @@ export async function fetchTvaEnrichmentAction(
   } catch (e) {
     console.error("fetchTvaEnrichmentAction failed:", e);
     return { error: "ייבוא נתוני התב\"ע נכשל" };
+  }
+}
+
+/**
+ * Smart enrichment — autonomously bring REAL area deals (+structured facts) even
+ * when the user didn't upload enough. Modeled on fetchTvaEnrichmentAction: an
+ * offered step, persists to CustomEvidence (sourceKind:"web"), and also seeds the
+ * global Comparable collection. Deal facts carry sourceUrl + verbatim quote; no
+ * computed anchors are ever stored.
+ */
+export async function fetchDealEnrichmentAction(
+  jobId: string,
+): Promise<{ deals: number; mapped: number; warnings: string[] } | AuthFail | Err> {
+  const owned = await ownedJob(jobId);
+  if (owned.fail) return owned.fail;
+  try {
+    const enr = owned.job.enrichment ?? {};
+    const identity = owned.job.identity ?? {};
+    const parcelIdentity = {
+      city: identity.city,
+      neighborhood: identity.neighborhood,
+      site: identity.site,
+      gush: identity.gush,
+      helka: identity.helka,
+      planNumber: identity.planNumber,
+      lat: enr.lat,
+      lng: enr.lng,
+    };
+
+    const template = await ExcelTemplate.findById(owned.job.templateId).lean();
+    const fields = (((template as any)?.fields ?? []) as FieldSpec[]).filter((f) => f.enabled);
+    const weakFields = fields
+      .filter((f) => ["prices", "costs", "rights"].includes(f.domain))
+      .map((f) => ({ key: f.key, label: f.label, domain: f.domain }));
+
+    const result = await runEnrichment({
+      identity: parcelIdentity,
+      weakFields,
+      available: ["nadlan", "madlan", "govmap", "yad2", "iplan", "rmi"],
+      budget: { maxTasks: 4, deadlineMs: 180_000 },
+    });
+
+    // Structured field mappings (e.g. plot_area_sqm) → real template-field candidates.
+    const enabledKeys = fields.map((f) => f.key);
+    const structuredCandidates = factsToEvidenceCandidates(result.facts, enabledKeys);
+    // Deal facts → display/audit candidates under a synthetic key.
+    const dealCandidates = result.facts
+      .filter((f) => f.kind === "deal" && f.deal)
+      .map((f) => ({
+        fieldKey: "comparable_deal",
+        value: f.deal!.pricePerSqm ?? f.deal!.totalPrice ?? 0,
+        confidence: f.confidence,
+        rawQuote: f.quote,
+        sourceUrl: f.sourceUrl,
+      }));
+    const candidates = [...structuredCandidates, ...dealCandidates];
+
+    await CustomEvidence.findOneAndUpdate(
+      { jobId: owned.job._id, domain: "prices", sourceKind: "web", fileId: null },
+      { candidates, ok: true, model: "smart" },
+      { upsert: true },
+    );
+
+    // Also seed the global Comparable collection (no anchor recompute).
+    await persistDealsToComparables(result.facts, identity.city).catch(() => null);
+
+    owned.job.enrichment = {
+      ...enr,
+      dealsAccepted: true,
+      dealsFound: result.stats.deals,
+    };
+    owned.job.warnings = [...(owned.job.warnings ?? []), ...result.warnings].slice(0, 40);
+    owned.job.markModified("enrichment");
+    await owned.job.save();
+    return {
+      deals: result.stats.deals,
+      mapped: structuredCandidates.length,
+      warnings: result.warnings,
+    };
+  } catch (e) {
+    console.error("fetchDealEnrichmentAction failed:", e);
+    return { error: "איתור עסקאות אמת נכשל" };
   }
 }
 

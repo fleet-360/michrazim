@@ -18,6 +18,7 @@ import {
 import { importTenderAction, type TenderReportDTO } from "@/server/actions";
 import type { PlanInfo } from "@/lib/data/iplan";
 import type { CuratedPlan } from "@/lib/ai/layers";
+import { EnrichmentPanel } from "@/components/lean/enrichment-panel";
 import { Stat } from "@/components/tenders/stat";
 import { StatCard } from "@/components/common/stat-card";
 import { VerdictBadge } from "@/components/common/verdict-badge";
@@ -352,6 +353,22 @@ export function TenderReport({
           )}
         </Panel>
       )}
+
+      {/* 4b — smart enrichment: real area deals via web-navigation agent (offered) */}
+      <EnrichmentPanel
+        loggedIn={loggedIn}
+        identity={{
+          city: tender.city,
+          site: tender.site,
+          gush: tender.gush,
+          helka: tender.helka,
+          planNumber: tender.planNumber,
+          lat: location?.lat,
+          lng: location?.lng,
+          assetType:
+            estimate?.typology === "SINGLE_FAMILY" ? "single_family" : "residential",
+        }}
+      />
 
       {/* 5 — economic estimate (typology-aware, AI-grounded assumptions) */}
       {estimate && (

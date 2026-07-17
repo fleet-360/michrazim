@@ -1,5 +1,6 @@
 "use server";
 
+import mongoose from "mongoose";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -14,6 +15,8 @@ import { riskAnalysis, answerQuestion, decisionReport, parseTenderText, parseTen
 import { derivePlotForUnits } from "@/lib/import-derive";
 import { fetchPlansAtPoint, fetchPlansByNumber, type PlanInfo } from "@/lib/data/iplan";
 import { fetchParcelByGushHelka, govmapGeocode } from "@/lib/data/govmap";
+import { EnrichmentJob } from "./models-enrich";
+import type { ParcelIdentity as EnrichParcelIdentity, EnrichmentResult } from "@/lib/enrich/types";
 import type { DealInputs, Track } from "@/lib/engine/types";
 import {
   buildTenderIntelligence,
@@ -475,6 +478,56 @@ export async function importDealsAction(text: string, city: string) {
 
   revalidatePath("/comparables");
   return { count: docs.length };
+}
+
+/* ------------------------------------------------------------------ */
+/* Smart enrichment (full / partial modes) — background job + polling   */
+/* The web-navigation agent runs for minutes, longer than a serverless   */
+/* request, so we create a job, process it in a route handler            */
+/* (maxDuration=300), and the client polls for progress + result.        */
+/* ------------------------------------------------------------------ */
+
+export async function offerDealEnrichmentAction(input: {
+  identity: EnrichParcelIdentity;
+  refId?: string;
+  mode?: "full" | "partial";
+}): Promise<{ jobId: string } | { requireAuth: true } | { error: string }> {
+  const session = await getSession();
+  if (!session) return { requireAuth: true as const };
+  await connectDB();
+  const weakFields = [
+    { key: "comparable_deals", label: "עסקאות השוואה באזור", domain: "prices" },
+  ];
+  const job = await EnrichmentJob.create({
+    userId: session.id,
+    mode: input.mode ?? "full",
+    refId: input.refId,
+    identity: input.identity,
+    weakFields,
+    status: "queued",
+    progress: [],
+  });
+  return { jobId: String(job._id) };
+}
+
+export async function pollDealEnrichmentAction(
+  jobId: string,
+): Promise<
+  | { status: string; progress: string[]; result?: EnrichmentResult; error?: string }
+  | { requireAuth: true }
+  | { error: string }
+> {
+  const session = await getSession();
+  if (!session) return { requireAuth: true as const };
+  if (!mongoose.isValidObjectId(jobId)) return { error: "עבודה לא נמצאה" };
+  await connectDB();
+  const job = await EnrichmentJob.findById(jobId).lean<any>();
+  if (!job || String(job.userId) !== session.id) return { error: "עבודה לא נמצאה" };
+  const result =
+    job.status === "done"
+      ? { plan: job.plan, facts: job.facts ?? [], warnings: job.warnings ?? [], stats: job.stats }
+      : undefined;
+  return { status: job.status, progress: job.progress ?? [], result, error: job.error };
 }
 
 export async function deleteComparableAction(id: string) {

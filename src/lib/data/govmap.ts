@@ -23,15 +23,29 @@ const geoCache = new Map<string, GeoHit | null>();
 // preference order: precise address/parcel first, then neighborhood/street, then POI
 const GEO_TYPE_RANK = ["ADDRESS", "GOVMAP_PARCEL_ALL", "NEIGHBORHOOD", "STREET", "POI_MID_POINT"];
 
-type GovHit = { X?: number; Y?: number; ResultLable?: string; Gush?: string; Parcel?: string };
+type GovHit = {
+  X?: number;
+  Y?: number;
+  ResultLable?: string;
+  Gush?: string;
+  Parcel?: string;
+  ObjectID?: string | number;
+  DescLayerID?: string;
+  ObjectKey?: string;
+};
+
+/** Shared raw fetch of the GovMap DetailsByQuery `data` bucket map. */
+async function fetchDetailsByQuery(q: string): Promise<Record<string, GovHit[]> | null> {
+  const url = `https://es.govmap.gov.il/TldSearch/api/DetailsByQuery?query=${encodeURIComponent(q)}&lyrs=276267023&gid=govmap`;
+  const json = await safeJson<{ data?: Record<string, GovHit[]> }>(url, { timeoutMs: 9000 });
+  return json?.data ?? null;
+}
 
 export async function govmapGeocode(query: string): Promise<GeoHit | null> {
   const q = query.trim();
   if (!q) return null;
   if (geoCache.has(q)) return geoCache.get(q)!;
-  const url = `https://es.govmap.gov.il/TldSearch/api/DetailsByQuery?query=${encodeURIComponent(q)}&lyrs=276267023&gid=govmap`;
-  const json = await safeJson<{ data?: Record<string, GovHit[]> }>(url, { timeoutMs: 9000 });
-  const data = json?.data;
+  const data = await fetchDetailsByQuery(q);
   let best: GeoHit | null = null;
   if (data) {
     const pick = (arr?: GovHit[]): GeoHit | null => {
@@ -59,6 +73,69 @@ export async function govmapGeocode(query: string): Promise<GeoHit | null> {
   }
   geoCache.set(q, best);
   return best;
+}
+
+/**
+ * Step-1 locator for the nadlan deal-data API. Resolves a place string to the
+ * {base_id, base_name} pair the deal endpoint keys on. GovMap's DetailsByQuery is
+ * the same search the nadlan SPA now uses; we pick the most relevant area bucket
+ * (neighborhood/street give tighter comps, settlement is the always-populated
+ * fallback) and map it to nadlan's base_name vocabulary.
+ */
+export interface NadlanLocator {
+  baseId: string;
+  baseName: "setlCode" | "streetCode" | "neighborhoodId" | "addressId";
+}
+const locateCache = new Map<string, NadlanLocator | null>();
+// deals: prefer tighter areas, but settlement is the reliable fallback that always has rows.
+const LOCATE_BUCKET_RANK: { bucket: string; baseName: NadlanLocator["baseName"] }[] = [
+  { bucket: "NEIGHBORHOOD", baseName: "neighborhoodId" },
+  { bucket: "SETTLEMENT", baseName: "setlCode" },
+  { bucket: "STREET", baseName: "streetCode" },
+  { bucket: "ADDRESS", baseName: "addressId" },
+];
+
+/**
+ * Raw ObjectID for a single GovMap bucket (SETTLEMENT / NEIGHBORHOOD / STREET).
+ * Used to key nadlan's static area-data JSON (settlement/neighborhood codes).
+ */
+export async function govmapObjectId(
+  query: string,
+  bucket: "SETTLEMENT" | "NEIGHBORHOOD" | "STREET",
+): Promise<string | null> {
+  const q = query.trim();
+  if (!q) return null;
+  const data = await fetchDetailsByQuery(q);
+  const hit = data?.[bucket]?.find((h) => h.ObjectID !== undefined && String(h.ObjectID) !== "");
+  if (!hit?.ObjectID) return null;
+  const s = String(hit.ObjectID);
+  return s.includes("|") ? s.split("|").pop() || s : s;
+}
+
+export async function govmapLocateForDeals(query: string): Promise<NadlanLocator | null> {
+  const q = query.trim();
+  if (!q) return null;
+  if (locateCache.has(q)) return locateCache.get(q)!;
+  const data = await fetchDetailsByQuery(q);
+  let hit: NadlanLocator | null = null;
+  if (data) {
+    const objectIdOf = (h?: GovHit): string | null => {
+      const raw = h?.ObjectID;
+      if (raw === undefined || raw === null || String(raw) === "") return null;
+      const s = String(raw);
+      // some buckets encode the id as "…|…|<id>"
+      return s.includes("|") ? s.split("|").pop() || s : s;
+    };
+    for (const { bucket, baseName } of LOCATE_BUCKET_RANK) {
+      const id = objectIdOf(data[bucket]?.find((h) => h.ObjectID !== undefined));
+      if (id) {
+        hit = { baseId: id, baseName };
+        break;
+      }
+    }
+  }
+  locateCache.set(q, hit);
+  return hit;
 }
 
 /**

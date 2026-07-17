@@ -62,6 +62,8 @@ const ComparableSchema = new Schema(
     city: String,
     neighborhood: String,
     address: String,
+    gush: String,
+    helka: String,
     lat: Number,
     lng: Number,
     dealDate: String,
@@ -72,7 +74,11 @@ const ComparableSchema = new Schema(
     floor: Number,
     yearBuilt: Number,
     propertyType: String,
-    source: { type: String, enum: ["live", "mock"], default: "mock" },
+    source: { type: String, enum: ["live", "mock", "web"], default: "mock" },
+    // Provenance for web-agent enriched deals (smart enrichment layer).
+    sourceKind: String, // "nadlan" | "madlan" | "govmap" | "yad2" | "web"
+    sourceUrl: String,
+    quote: String, // verbatim snippet backing the row
   },
   { timestamps: true },
 );

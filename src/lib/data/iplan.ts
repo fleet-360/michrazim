@@ -150,8 +150,16 @@ export async function fetchPlansByNumber(planNumber: string): Promise<PlanInfo[]
   if (!clean) return [];
   const key = `pl:${clean}`;
   if (cache.has(key)) return cache.get(key)!;
-  const escaped = clean.replace(/'/g, "''");
-  const features = await queryXplan({ where: `pl_number='${escaped}'` });
+  // XPlan is inconsistent about spacing around the slash — e.g. תמ"ל plans are
+  // stored as "תמל/ 1016" while booklets write "תמל/1016". Try the exact form
+  // first, then the space-after-slash variant.
+  const variants = [...new Set([clean, clean.replace(/\/\s*/g, "/ "), clean.replace(/\/\s+/g, "/")])];
+  let features: XplanFeature[] = [];
+  for (const v of variants) {
+    const escaped = v.replace(/'/g, "''");
+    features = await queryXplan({ where: `pl_number='${escaped}'` });
+    if (features.length) break;
+  }
   const plans = mapAndSortPlans(features, 5);
   cache.set(key, plans);
   return plans;

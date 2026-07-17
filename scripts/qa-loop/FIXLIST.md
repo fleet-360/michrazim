@@ -1,5 +1,7 @@
 # FIXLIST — לולאת QA
 
+**סיכום סופי (סבב 10):** כל ה-P1 Fixed+Verified; כל ה-P2 Fixed+Verified מלבד F-3.2 (Open מתועד); P3/EXT פתוחים מתועדים למטה. ציון רובריקה: 3.2 (סבב 1) → 4.5 (סבב 10). רגרסיות: aggressive-test ו-custom-aggressive — אפס כשלים ואפס אזהרות.
+
 סטטוסים: Open → Fixed(סבב M) → Verified(סבב M+1). סיווג: EXT (חיצוני) / BUG (קוד) / AI (פרומפט/איכות) / UI.
 
 | ID | סבב | חומרה | סיווג | תיאור | סטטוס |

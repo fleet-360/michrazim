@@ -25,4 +25,8 @@
 | F-4.1 | 4 | P2 | BUG | ‏e2e מיושנים (KPI/כותרות/קנבס מפה) + תלות בפרויקטים שאינם ב-seed | Fixed(4)+Verified(4) — 2 עוברות, 2 מדולגות בצדק |
 | F-4.2 | 4 | P2 | BUG | תב"ע של שכונה לא נכונה בצנטרואיד עיר — נוסף fetchPlansByName | Fixed(4)+Verified(4b) |
 | F-4.3 | 4 | P3 | UI | ‏"‎-23169%" — תצוגת headroom קיצוני | Fixed(4)+Verified(4b) |
-| F-4.4 | 4 | P1 | BUG | ‏parse נשבר בשקט על גרשיים עבריות בפלט המודל (repair חסר ב-insights) | Fixed(4)+Verified(4) |
+| F-4.4 | 4 | P1 | BUG | ‏parse נשבר בשקט על גרשיים עבריות בפלט המודל (repair חסר ב-insights) | Verified(5) |
+| F-5.1 | 5 | P3 | EXT | אגרגטים של nadlan ריקים (nulls) ליישובים בדואים — האזהרה שלנו נכונה | תועד |
+| F-5.2 | 5 | P3 | EXT | ‏deal-data של nadlan חסום ל-automation גם headed (reCAPTCHA Enterprise) | תועד |
+| F-5.3 | 5 | P3 | AI | עסקאות כמעט-כפולות עוברות דדופ (מפתח כולל מחיר+תאריך) | Open |
+| F-5.4 | 5 | P3 | AI | אין אומדן בהיעדר שטח מגרש — לשקול שטח טיפוסי מסומן "משוער" | Open |

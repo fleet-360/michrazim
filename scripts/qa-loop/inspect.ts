@@ -55,9 +55,19 @@ async function main() {
 
   // The AI pipeline runs for minutes; the report opens with the tender panel.
   // Match the panel's h3 heading specifically — the page intro text also
-  // contains the words "פרטי המכרז".
+  // contains the words "פרטי המכרז". With --expect-error we accept either the
+  // report or the uploader's Hebrew error message (adversarial inputs).
+  const reportHead = page.locator("h3", { hasText: "פרטי המכרז" }).first();
+  const uploadError = page.locator("p.bg-danger\\/12, p[class*='text-danger']").first();
   try {
-    await page.locator("h3", { hasText: "פרטי המכרז" }).first().waitFor({ timeout: 600_000 });
+    if (has("expect-error")) {
+      await Promise.race([
+        reportHead.waitFor({ timeout: 300_000 }),
+        uploadError.waitFor({ timeout: 300_000 }),
+      ]);
+    } else {
+      await reportHead.waitFor({ timeout: 600_000 });
+    }
   } catch (e) {
     await page.screenshot({ path: path.join(outDir, "02-report-failed.png"), fullPage: true });
     console.log("report did not render — see 02-report-failed.png");

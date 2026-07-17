@@ -197,12 +197,21 @@ export async function fetchParcelByGushHelka(
   if (parcelCache.has(key)) return parcelCache.get(key)!;
   const cql = encodeURIComponent(`GUSH_NUM=${gush} AND PARCEL=${helka}`);
   // GovMap's WFS returns geometry in EPSG:3857 — reproject to lng/lat.
-  const json = await safeJson<{
+  // The service routinely takes ~10s per request, so a 16s single shot was
+  // flaky — allow a longer window and one retry before giving up.
+  type ParcelWfs = {
     features?: { geometry?: { type?: string; coordinates?: number[][][] | number[][][][] } }[];
-  }>(GOVMAP_PARCEL_QUERY + cql, { timeoutMs: 16000 });
+  };
+  let json: ParcelWfs | null = null;
+  for (let attempt = 0; attempt < 2 && !json; attempt++) {
+    json = await safeJson<ParcelWfs>(GOVMAP_PARCEL_QUERY + cql, { timeoutMs: 30000 });
+  }
   const feat = json?.features?.[0]?.geometry;
   if (!feat?.coordinates) {
-    parcelCache.set(key, null);
+    // A fetch failure (timeout / network) is transient — don't poison the
+    // cache for the whole server session. Only cache "no such parcel" when
+    // the WFS actually answered.
+    if (json) parcelCache.set(key, null);
     return null;
   }
   // MultiPolygon → [[[ [x,y]... ]]]  ; Polygon → [[ [x,y]... ]]

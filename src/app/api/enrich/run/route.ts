@@ -39,18 +39,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, status: job.status });
   }
 
-  job.status = "planning";
-  job.progress = [];
-  await job.save();
+  // All writes below are atomic updateOne's — the throttled progress writer
+  // runs concurrently with the final result write, and two document.save()
+  // calls on the same doc in parallel throw (ParallelSaveError), which used to
+  // leave jobs stuck in "fetching" forever.
+  await EnrichmentJob.updateOne({ _id: job._id }, { $set: { status: "planning", progress: [] } });
 
   // Throttle progress writes to avoid hammering the DB.
   let lastWrite = 0;
+  let progress: string[] = [];
+  let phase: "planning" | "fetching" = "planning";
   const pushProgress = async (msg: string) => {
-    job.progress = [...(job.progress ?? []), msg].slice(-40);
+    progress = [...progress, msg].slice(-40);
     const now = Date.now();
     if (now - lastWrite > 1500) {
       lastWrite = now;
-      await job.save().catch(() => null);
+      await EnrichmentJob.updateOne({ _id: job._id }, { $set: { status: phase, progress } }).catch(
+        () => null,
+      );
     }
   };
 
@@ -61,7 +67,7 @@ export async function POST(req: NextRequest) {
       available: ["nadlan", "madlan", "govmap", "yad2", "iplan", "rmi"],
       budget: { maxTasks: 5, deadlineMs: 260_000 },
       onProgress: (ev) => {
-        if (ev.phase === "fetching" && job.status !== "fetching") job.status = "fetching";
+        if (ev.phase === "fetching") phase = "fetching";
         void pushProgress(ev.msg);
       },
     });
@@ -70,17 +76,26 @@ export async function POST(req: NextRequest) {
       () => null,
     );
 
-    job.status = "done";
-    job.plan = result.plan;
-    job.facts = result.facts;
-    job.warnings = result.warnings;
-    job.stats = result.stats;
-    await job.save();
+    await EnrichmentJob.updateOne(
+      { _id: job._id },
+      {
+        $set: {
+          status: "done",
+          progress,
+          plan: result.plan,
+          facts: result.facts,
+          warnings: result.warnings,
+          stats: result.stats,
+        },
+      },
+    );
     return NextResponse.json({ ok: true, status: "done", deals: result.stats.deals });
   } catch (e) {
-    job.status = "failed";
-    job.error = (e as Error).message;
-    await job.save().catch(() => null);
+    console.error("enrichment job failed:", e);
+    await EnrichmentJob.updateOne(
+      { _id: job._id },
+      { $set: { status: "failed", error: (e as Error).message } },
+    ).catch(() => null);
     return NextResponse.json({ error: "enrichment failed" }, { status: 500 });
   }
 }

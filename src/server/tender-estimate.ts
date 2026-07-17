@@ -335,6 +335,7 @@ async function safeCritique(
         farUsed: estimate.farUsed,
       },
       farNote: FAR_NOTES[estimate.farSource],
+      farSource: estimate.farSource,
     });
   } catch (e) {
     console.error("estimate critique failed:", e);

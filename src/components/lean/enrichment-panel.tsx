@@ -52,16 +52,29 @@ export function EnrichmentPanel({
       body: JSON.stringify({ jobId }),
     }).catch(() => null);
 
+    // Watchdog: the server run is capped at ~4.5 minutes — if the job never
+    // reaches a terminal state (e.g. the processing route died), stop the
+    // infinite spinner and let the user retry.
+    const startedAt = Date.now();
     pollRef.current = setInterval(async () => {
       const p = await pollDealEnrichmentAction(jobId);
-      if ("requireAuth" in p || "error" in p) return;
-      setProgress(p.progress ?? []);
-      if (p.status === "done" && p.result) {
-        setResult(p.result);
-        setStatus("done");
-        if (pollRef.current) clearInterval(pollRef.current);
-      } else if (p.status === "failed") {
-        setError(p.error || "ההעשרה נכשלה");
+      if (!("requireAuth" in p) && !("error" in p)) {
+        setProgress(p.progress ?? []);
+        if (p.status === "done" && p.result) {
+          setResult(p.result);
+          setStatus("done");
+          if (pollRef.current) clearInterval(pollRef.current);
+          return;
+        }
+        if (p.status === "failed") {
+          setError(p.error || "ההעשרה נכשלה");
+          setStatus("failed");
+          if (pollRef.current) clearInterval(pollRef.current);
+          return;
+        }
+      }
+      if (Date.now() - startedAt > 6 * 60 * 1000) {
+        setError("ההעשרה לא הסתיימה בזמן סביר — נסו שוב");
         setStatus("failed");
         if (pollRef.current) clearInterval(pollRef.current);
       }

@@ -159,6 +159,23 @@ export async function fetchPlanCenter(planNumber: string): Promise<{ lat: number
   return null;
 }
 
+/**
+ * Plans matched by NAME keywords (e.g. neighborhood + city). XPlan plan names
+ * follow "מגרש X שכ' <שכונה>, <עיר>" conventions, so an AND of LIKE terms finds
+ * the neighborhood's plans even when a centroid point-query misses them.
+ */
+export async function fetchPlansByName(keywords: string[], limit = 10): Promise<PlanInfo[]> {
+  const terms = keywords.map((k) => k.trim()).filter((k) => k.length >= 2).slice(0, 3);
+  if (!terms.length) return [];
+  const key = `nm:${terms.join("|")}`;
+  if (cache.has(key)) return cache.get(key)!;
+  const where = terms.map((t) => `pl_name LIKE '%${t.replace(/'/g, "''")}%'`).join(" AND ");
+  const features = await queryXplan({ where, resultRecordCount: "40" });
+  const plans = mapAndSortPlans(features, limit);
+  cache.set(key, plans);
+  return plans;
+}
+
 /** All plans (תב"ע) whose blue line covers the given WGS84 point. */
 export async function fetchPlansAtPoint(lat: number, lng: number, limit = 10): Promise<PlanInfo[]> {
   const key = `pt:${lat.toFixed(4)}/${lng.toFixed(4)}`;

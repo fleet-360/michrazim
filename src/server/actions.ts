@@ -13,7 +13,13 @@ import { analyzeProject, feeScheduleFor } from "./analysis";
 import { VIEW_COOKIE, VIEW_HOME, isViewMode, type ViewMode } from "@/lib/view-mode";
 import { riskAnalysis, answerQuestion, decisionReport, parseTenderText, parseTenderDocument, methodologyAssistant, parseDealsText, type ProjectMeta, type ParsedTender } from "@/lib/ai/insights";
 import { derivePlotForUnits } from "@/lib/import-derive";
-import { fetchPlansAtPoint, fetchPlansByNumber, fetchPlanCenter, type PlanInfo } from "@/lib/data/iplan";
+import {
+  fetchPlansAtPoint,
+  fetchPlansByNumber,
+  fetchPlansByName,
+  fetchPlanCenter,
+  type PlanInfo,
+} from "@/lib/data/iplan";
 import { fetchParcelByGushHelka, govmapGeocode } from "@/lib/data/govmap";
 import { EnrichmentJob } from "./models-enrich";
 import type { ParcelIdentity as EnrichParcelIdentity, EnrichmentResult } from "@/lib/enrich/types";
@@ -275,6 +281,23 @@ export async function analyzeTenderUploadAction(input: {
       const byNumber = await fetchPlansByNumber(tender.planNumber);
       const seen = new Set(byNumber.map((p) => p.planNumber));
       plans = [...byNumber, ...plans.filter((p) => !seen.has(p.planNumber))];
+    }
+    // Imprecise location (city centroid / plan bbox) + a named neighborhood:
+    // a centroid point-query returns citywide plans of the WRONG area, so pull
+    // the neighborhood's own plans by name (XPlan names carry "שכ' X, עיר").
+    if ((location?.origin === "city" || location?.origin === "plan") && tender.site && tender.city) {
+      const siteTerm = tender.site
+        .replace(/\(.*?\)/g, " ")
+        .replace(/שכונת|השכונה|שכ'|רובע|אתר|מתחם/g, " ")
+        .trim()
+        .split(/\s+/)
+        .filter((w) => w.length >= 2)[0];
+      if (siteTerm) {
+        const byName = await fetchPlansByName([siteTerm, tender.city]);
+        const seen = new Set(plans.map((p) => p.planNumber));
+        // Neighborhood plans first — they're the ones the tender lives in.
+        plans = [...byName.filter((p) => !seen.has(p.planNumber)), ...plans].slice(0, 14);
+      }
     }
   } catch (e) {
     console.error("xplan lookup failed:", e);

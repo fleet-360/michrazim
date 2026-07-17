@@ -401,9 +401,15 @@ export function TenderReport({
                 <StatCard
                   label="מול מחיר המינימום"
                   value={
-                    minPriceComparison.headroom >= 0
-                      ? `+${formatPct(minPriceComparison.headroomPct, 0)}`
-                      : formatPct(minPriceComparison.headroomPct, 0)
+                    // Beyond ±10x the percentage stops being informative
+                    // ("-23,169%") — show a capped, readable form instead.
+                    Math.abs(minPriceComparison.headroomPct) > 10
+                      ? minPriceComparison.headroomPct > 0
+                        ? "פי +10"
+                        : "מתחת בהרבה"
+                      : minPriceComparison.headroom >= 0
+                        ? `+${formatPct(minPriceComparison.headroomPct, 0)}`
+                        : formatPct(minPriceComparison.headroomPct, 0)
                   }
                   sub={`מינימום ${formatShekelShort(minPriceComparison.minPrice)} · מרווח ${formatShekelShort(minPriceComparison.headroom)}`}
                   icon={TrendingUp}

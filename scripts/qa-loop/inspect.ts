@@ -56,7 +56,13 @@ async function main() {
   // The AI pipeline runs for minutes; the report opens with the tender panel.
   // Match the panel's h3 heading specifically — the page intro text also
   // contains the words "פרטי המכרז".
-  await page.locator("h3", { hasText: "פרטי המכרז" }).first().waitFor({ timeout: 600_000 });
+  try {
+    await page.locator("h3", { hasText: "פרטי המכרז" }).first().waitFor({ timeout: 600_000 });
+  } catch (e) {
+    await page.screenshot({ path: path.join(outDir, "02-report-failed.png"), fullPage: true });
+    console.log("report did not render — see 02-report-failed.png");
+    throw e;
+  }
   await page.waitForTimeout(2000);
   await page.screenshot({ path: path.join(outDir, "02-report.png"), fullPage: true });
   console.log("report rendered → 02-report.png");

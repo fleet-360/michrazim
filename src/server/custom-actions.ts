@@ -126,10 +126,18 @@ function sniffMime(bytes: Buffer, declared: string): string | null {
   return null;
 }
 
-function fmtValue(value: string | number | null, dataType: FieldSpec["dataType"], unit?: string): string {
+function fmtValue(
+  value: string | number | null,
+  dataType: FieldSpec["dataType"],
+  unit?: string,
+  domain?: FieldDomain,
+): string {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "number") {
     if (dataType === "percent") return `${(value <= 1 ? value * 100 : value).toFixed(1)}%`;
+    // Identifiers (gush, helka, plot/tender numbers) are labels, not amounts —
+    // "גוש 38,758" reads wrong.
+    if (domain === "identity") return String(value);
     const s = value.toLocaleString("he-IL");
     if (dataType === "currency") return `${s} ₪`;
     return unit ? `${s} ${unit}` : s;
@@ -158,7 +166,7 @@ function toJobDTO(
         unit: spec.unit,
         domain: spec.domain,
         value: r.value ?? null,
-        displayValue: r.displayValue || fmtValue(r.value ?? null, spec.dataType, spec.unit),
+        displayValue: r.displayValue || fmtValue(r.value ?? null, spec.dataType, spec.unit, spec.domain),
         sourceKind: r.source?.kind,
         sourceName:
           r.source?.kind === "xplan"
@@ -862,7 +870,7 @@ export async function reconcileDomainAction(
           results.push({
             fieldKey: f.fieldKey,
             value: f.value,
-            displayValue: fmtValue(f.value, spec.dataType, spec.unit),
+            displayValue: fmtValue(f.value, spec.dataType, spec.unit, spec.domain),
             source: chosen
               ? {
                   kind: chosen.kind === "xplan" ? "xplan" : "document",
@@ -914,7 +922,7 @@ export async function updateFinalValueAction(
     results.push(row);
   }
   row.value = value;
-  row.displayValue = fmtValue(value, spec.dataType, spec.unit);
+  row.displayValue = fmtValue(value, spec.dataType, spec.unit, spec.domain);
   row.userEdited = true;
   row.conflict = false;
   row.source = { kind: "user" };

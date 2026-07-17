@@ -38,6 +38,7 @@ function Panel({ title, children, className }: { title: string; children: React.
 const ORIGIN_LABEL: Record<string, string> = {
   parcel: "חלקה מדויקת (רישום קדסטרי)",
   geocode: "איתור לפי כתובת/מתחם",
+  plan: "מרכז תחום התכנית (קו כחול)",
   city: "מרכז העיר — מיקום משוער",
 };
 

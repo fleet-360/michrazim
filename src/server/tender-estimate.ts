@@ -28,7 +28,7 @@ export interface TenderLocationDTO {
   /** Measured parcel area when the cadastral lookup succeeded. */
   areaSqm?: number;
   /** How precise the location is: exact parcel > address geocode > city centroid. */
-  origin: "parcel" | "geocode" | "city";
+  origin: "parcel" | "geocode" | "plan" | "city";
   gush?: string;
   helka?: string;
   label?: string;

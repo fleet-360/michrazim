@@ -129,6 +129,36 @@ async function queryXplan(params: Record<string, string>): Promise<XplanFeature[
   return json.features;
 }
 
+/**
+ * Approximate WGS84 center of a plan's blue line (bbox center via
+ * returnExtentOnly — cheap even for huge plans). Good enough to anchor a
+ * tender that states a plan number but no gush/helka.
+ */
+export async function fetchPlanCenter(planNumber: string): Promise<{ lat: number; lng: number } | null> {
+  const clean = planNumber.trim();
+  if (!clean) return null;
+  const variants = [...new Set([clean, clean.replace(/\/\s*/g, "/ "), clean.replace(/\/\s+/g, "/")])];
+  for (const v of variants) {
+    const escaped = v.replace(/'/g, "''");
+    const search = new URLSearchParams({
+      f: "json",
+      where: `pl_number='${escaped}'`,
+      returnExtentOnly: "true",
+      outSR: "4326",
+    });
+    const json = await safeJson<{ extent?: { xmin: number; ymin: number; xmax: number; ymax: number } }>(
+      `${XPLAN_QUERY_URL}?${search.toString()}`,
+      { timeoutMs: 9000 },
+    );
+    const e = json?.extent;
+    // ArcGIS signals "no features" with NaN extents.
+    if (e && [e.xmin, e.ymin, e.xmax, e.ymax].every((n) => typeof n === "number" && isFinite(n))) {
+      return { lat: (e.ymin + e.ymax) / 2, lng: (e.xmin + e.xmax) / 2 };
+    }
+  }
+  return null;
+}
+
 /** All plans (תב"ע) whose blue line covers the given WGS84 point. */
 export async function fetchPlansAtPoint(lat: number, lng: number, limit = 10): Promise<PlanInfo[]> {
   const key = `pt:${lat.toFixed(4)}/${lng.toFixed(4)}`;

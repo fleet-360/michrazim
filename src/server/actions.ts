@@ -13,7 +13,7 @@ import { analyzeProject, feeScheduleFor } from "./analysis";
 import { VIEW_COOKIE, VIEW_HOME, isViewMode, type ViewMode } from "@/lib/view-mode";
 import { riskAnalysis, answerQuestion, decisionReport, parseTenderText, parseTenderDocument, methodologyAssistant, parseDealsText, type ProjectMeta, type ParsedTender } from "@/lib/ai/insights";
 import { derivePlotForUnits } from "@/lib/import-derive";
-import { fetchPlansAtPoint, fetchPlansByNumber, type PlanInfo } from "@/lib/data/iplan";
+import { fetchPlansAtPoint, fetchPlansByNumber, fetchPlanCenter, type PlanInfo } from "@/lib/data/iplan";
 import { fetchParcelByGushHelka, govmapGeocode } from "@/lib/data/govmap";
 import { EnrichmentJob } from "./models-enrich";
 import type { ParcelIdentity as EnrichParcelIdentity, EnrichmentResult } from "@/lib/enrich/types";
@@ -240,6 +240,21 @@ export async function analyzeTenderUploadAction(input: {
           gush: hit.gush ?? tender.gush,
           helka: hit.parcel ?? tender.helka,
           label: hit.label,
+        };
+      }
+    }
+    // A stated plan number anchors the tender inside the plan's blue line —
+    // far better than a city centroid for the plans panel and the map pin.
+    if (!location && tender.planNumber) {
+      const center = await fetchPlanCenter(tender.planNumber);
+      if (center) {
+        location = {
+          lat: center.lat,
+          lng: center.lng,
+          origin: "plan",
+          gush: tender.gush,
+          helka: tender.helka,
+          label: `תחום תכנית ${tender.planNumber}`,
         };
       }
     }

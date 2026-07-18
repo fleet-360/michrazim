@@ -59,6 +59,17 @@ export interface AgentDeal extends DealFact {
  * allowlisted sourceUrl, a real quote (≥8 chars), or a price signal. Derives
  * ₪/m² only from real fetched totalPrice/sizeSqm. Caps the result set.
  */
+/** "13/05/2026" / "2026-05-13" / "05/2026" → "5|2026" (month bucket for near-dup detection). */
+function monthOf(dateStr?: string): string {
+  const parts = (dateStr ?? "").split(/[./\-\s]+/).map((p) => parseInt(p, 10)).filter(Number.isFinite);
+  if (!parts.length) return dateStr ?? "";
+  const yearIdx = parts.findIndex((p) => p > 1900);
+  if (yearIdx === -1) return parts.join("|");
+  // Year-first (ISO): month follows the year. Year-last (he-IL): month precedes it.
+  const month = yearIdx === 0 ? parts[1] : parts[yearIdx - 1];
+  return `${month ?? ""}|${parts[yearIdx]}`;
+}
+
 export function validateDeals(raw: AgentDeal[], fallbackUrls: string[] = []): FactCard[] {
   const fetchedAt = new Date().toISOString();
   const out: FactCard[] = [];
@@ -84,6 +95,12 @@ export function validateDeals(raw: AgentDeal[], fallbackUrls: string[] = []): Fa
     const key = [d.gush, d.helka, d.dealDate, total, str(d.address)].join("|");
     if (seen.has(key)) continue;
     seen.add(key);
+    // Near-duplicate guard: the same flat re-listed with a slightly different
+    // price/date (same address + rooms + size within the same month) is one
+    // deal, not two. Different flats in one building differ in size/rooms.
+    const nearKey = [str(d.address), num(d.rooms), size, monthOf(str(d.dealDate))].join("|");
+    if (str(d.address) && size && seen.has(`near:${nearKey}`)) continue;
+    seen.add(`near:${nearKey}`);
 
     const deal: DealFact = {
       address: str(d.address),

@@ -217,6 +217,24 @@ export async function analyzeTenderUploadAction(input: {
   // 1. Parse — a failure here is a real error (nothing to report on), trial NOT burned.
   const tender = pdf ? await parseTenderDocument(pdf, text || undefined) : await parseTenderText(text);
   if (!tender) return { error: "לא הצלחתי לחלץ נתונים מהמכרז — נסו טקסט מפורט יותר" };
+  // A document with zero identifying tender signals (junk text, a bare
+  // contract) should say so honestly instead of rendering an empty report shell.
+  const hasTenderSignal = Boolean(
+    tender.city ||
+      tender.gush ||
+      tender.plotAreaSqm ||
+      tender.units ||
+      tender.minPrice ||
+      tender.planNumber ||
+      tender.tenderId ||
+      tender.developmentCost,
+  );
+  if (!hasTenderSignal) {
+    return {
+      error:
+        "המסמך לא נראה כמו חוברת מכרז — לא זוהו בו עיר, גוש/מגרש, יח״ד או מחירים. אם זהו חוזה או נספח, הדביקו גם את עמודי פרטי המכרז מהחוברת.",
+    };
+  }
 
   const warnings: string[] = [];
 

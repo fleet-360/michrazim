@@ -71,6 +71,19 @@ async function main() {
   await page.screenshot({ path: shot("c4-results.png"), fullPage: true });
   console.log("results captured → c4-results.png");
 
+  if (process.argv.includes("--verify-resume")) {
+    // A refresh used to wipe the wizard; the resume banner must now bring the
+    // completed job's results back.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const resumeBtn = page.getByRole("button", { name: /הצגת התוצאות/ });
+    await resumeBtn.waitFor({ timeout: 60_000 });
+    await page.screenshot({ path: shot("c5-resume-banner.png"), fullPage: true });
+    await resumeBtn.click();
+    await page.getByText(/טבלת המיפוי/).waitFor({ timeout: 60_000 });
+    await page.screenshot({ path: shot("c6-resumed-results.png"), fullPage: true });
+    console.log("resume verified → c6-resumed-results.png");
+  }
+
   await browser.close();
   console.log("artifacts:", outDir);
 }

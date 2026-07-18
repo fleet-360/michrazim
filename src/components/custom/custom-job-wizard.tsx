@@ -109,6 +109,9 @@ async function uploadFileSmart(
 
 let eventSeq = 0;
 
+/** localStorage key holding the latest job id — survives refresh/HMR reloads. */
+const RESUME_KEY = "omdan.customJobId";
+
 export function CustomJobWizard() {
   const router = useRouter();
   const [phase, setPhase] = React.useState<Phase>("upload");
@@ -137,6 +140,20 @@ export function CustomJobWizard() {
   const docs = files.filter((f) => f.kind === "document");
   const canStart = Boolean(excel) && docs.length > 0;
 
+  // Resume: a refresh mid-flow used to lose everything although the job (and
+  // its results) live in the DB. Offer the last completed job back.
+  const [resume, setResume] = React.useState<CustomJobDTO | null>(null);
+  React.useEffect(() => {
+    const savedId = localStorage.getItem(RESUME_KEY);
+    if (!savedId) return;
+    getCustomJobAction(savedId)
+      .then((res) => {
+        if (res && "job" in res && res.job.results.length > 0) setResume(res.job);
+        else localStorage.removeItem(RESUME_KEY);
+      })
+      .catch(() => null);
+  }, []);
+
   /* ---------------- Phase: upload → analyze excel ---------------- */
   const start = async () => {
     setFatal("");
@@ -156,6 +173,7 @@ export function CustomJobWizard() {
       return;
     }
     setJobId(created.jobId);
+    localStorage.setItem(RESUME_KEY, created.jobId);
 
     // Upload files — chunked automatically when big (Vercel ~4.5MB request cap).
     let uploaded = 0;
@@ -369,6 +387,38 @@ export function CustomJobWizard() {
   if (phase === "upload" || phase === "error") {
     return (
       <div className="space-y-4">
+        {resume && (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
+            <p className="min-w-0 flex-1 text-sm">
+              <span className="font-semibold text-[#1E3A5F] dark:text-slate-100">עבודה קודמת שהושלמה:</span>{" "}
+              {resume.name} · {resume.results.length} שדות מולאו
+            </p>
+            <Button
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                setJobId(resume.id);
+                setJob(resume);
+                setResume(null);
+                setPhase("results");
+              }}
+            >
+              <ArrowLeft className="size-3.5" />
+              הצגת התוצאות
+            </Button>
+            <button
+              type="button"
+              aria-label="סגירת הצעת ההמשך"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                localStorage.removeItem(RESUME_KEY);
+                setResume(null);
+              }}
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        )}
         <div className="shadow-pill rounded-xl bg-white p-5 dark:bg-card dark:shadow-none">
           <h2 className="mb-1 text-base font-bold text-[#1E3A5F] dark:text-slate-100">ניתוח מכרז בהתאמה אישית</h2>
           <p className="mb-4 text-sm text-muted-foreground">

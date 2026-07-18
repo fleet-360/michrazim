@@ -10,11 +10,29 @@ import type { EnrichSourceKind, FactCard, DealFact } from "@/lib/enrich/types";
 export const DEAL_SITES: { kind: EnrichSourceKind; host: string; label: string }[] = [
   { kind: "nadlan", host: "nadlan.gov.il", label: "רשות המיסים (nadlan.gov.il)" },
   { kind: "madlan", host: "madlan.co.il", label: "מדלן" },
+  { kind: "komo", host: "komo.co.il", label: "קומו" },
+  { kind: "web", host: "project-tlv.info", label: "Project-TLV (עסקאות סגורות)" },
   { kind: "govmap", host: "govmap.gov.il", label: "govmap" },
   { kind: "yad2", host: "yad2.co.il", label: "יד2" },
 ];
 
 export const ALLOWED_HOSTS = [...DEAL_SITES.map((s) => s.host), "gov.il"];
+
+/**
+ * Default price basis by host when the agent didn't tag it. Deal registries and
+ * "sold" pages are CLOSED transactions; live listing boards are ASKING prices.
+ * Unknown web sources default to asking (the conservative choice — never let an
+ * untagged row inflate the closed-deal picture).
+ */
+export function inferPriceBasis(url?: string, tagged?: "closed" | "asking"): "closed" | "asking" {
+  if (tagged === "closed" || tagged === "asking") return tagged;
+  const h = hostOf(url ?? "") ?? "";
+  if (/(^|\.)nadlan\.gov\.il$|(^|\.)govmap\.gov\.il$/.test(h)) return "closed";
+  if (h === "project-tlv.info" || h.endsWith(".project-tlv.info")) return "closed";
+  // madlan carries both "שנמכרו" (closed) and "למכירה" (asking); without a tag
+  // we can't tell, so stay conservative.
+  return "asking";
+}
 
 export function hostOf(url: string): string | null {
   try {
@@ -116,6 +134,7 @@ export function validateDeals(raw: AgentDeal[], fallbackUrls: string[] = []): Fa
       floor: num(d.floor),
       yearBuilt: num(d.yearBuilt),
       assetType: str(d.assetType),
+      priceBasis: inferPriceBasis(sourceUrl, d.priceBasis),
     };
     out.push({
       taskId: "",

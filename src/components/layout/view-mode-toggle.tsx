@@ -42,7 +42,14 @@ export function ViewModeToggle({ target, className }: { target: Mode; className?
  * Three-way segmented switcher between the lean calculator, the full analyst
  * workspace and Custom mode. Highlights the current mode.
  */
-export function ViewModeSwitcher({ current, className }: { current: Mode; className?: string }) {
+export function ViewModeSwitcher({
+  current,
+  className,
+}: {
+  // "home" (the landing) highlights none of the three interface buttons.
+  current: Mode | "home";
+  className?: string;
+}) {
   const [pending, startTransition] = React.useTransition();
 
   return (

@@ -9,11 +9,50 @@ import type {
   EnrichmentBudget,
   EnrichmentResult,
   ProgressEvent,
+  FetchTask,
 } from "./types";
 
 export * from "./types";
 
 const DEFAULT_SOURCES: EnrichSourceKind[] = ["nadlan", "madlan", "govmap", "yad2", "iplan", "rmi"];
+
+/** Do the weak fields (or an empty set) call for comparable deals? */
+function wantsDeals(weakFields: WeakField[]): boolean {
+  if (weakFields.length === 0) return true; // no hints → deals are the safe default
+  return weakFields.some(
+    (f) =>
+      /price|deal|market|שווי|מחיר|עסקא/i.test(f.key) ||
+      ["prices", "market", "costs"].includes(f.domain ?? ""),
+  );
+}
+
+/**
+ * A deterministic comparable-deals task that needs NO AI. Comparable deals are
+ * the core feature, and the deal agent's primary sources (govmap official
+ * transactions + nadlan area medians) are plain HTTP — so this must run even when
+ * the AI planner is unavailable (dead/rotating key, rate-limit, outage).
+ */
+function defaultDealTask(identity: ParcelIdentity, targets: string[]): FetchTask {
+  const where = identity.neighborhood
+    ? `${identity.neighborhood} ${identity.city ?? ""}`.trim()
+    : identity.city ?? identity.site ?? "";
+  const type =
+    identity.assetType === "single_family"
+      ? "צמודי קרקע"
+      : identity.assetType === "commercial"
+        ? "מסחרי"
+        : "דירות";
+  return {
+    id: "deal-default",
+    intent: "comparable_deals",
+    method: "web_agent",
+    source: "nadlan",
+    reason: "איתור עסקאות אמת מהאזור (ברירת מחדל — לא תלוי ב-AI)",
+    targets,
+    query: `עסקאות ${type} ${where}`.trim(),
+    priority: "critical",
+  };
+}
 
 /**
  * Single entry point for the smart enrichment layer — used identically by full,
@@ -39,6 +78,18 @@ export async function runEnrichment(input: {
       available,
       maxTasks: input.budget?.maxTasks,
     })) ?? { tasks: [] };
+
+  // Deterministic floor: comparable deals are the core feature and their primary
+  // sources need no AI, so guarantee a deal task even if the planner is down or
+  // narrated instead of emitting one. (The planner also injects one when it can;
+  // this covers the AI-unavailable case that would otherwise return 0 facts.)
+  if (!plan.tasks.some((t) => t.intent === "comparable_deals") && wantsDeals(input.weakFields)) {
+    const targets = input.weakFields
+      .filter((f) => /price|deal|market|שווי|מחיר|עסקא/i.test(f.key))
+      .map((f) => f.key)
+      .slice(0, 12);
+    plan.tasks.unshift(defaultDealTask(input.identity, targets));
+  }
 
   input.onProgress?.({
     phase: "planning",

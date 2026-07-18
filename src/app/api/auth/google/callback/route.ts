@@ -9,7 +9,7 @@ const NEXT_COOKIE = "g_oauth_next";
 
 /** Only allow same-origin relative redirects (guard against open-redirect). */
 function safeNext(next: string): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/home";
 }
 
 function readCookie(req: Request, name: string): string {

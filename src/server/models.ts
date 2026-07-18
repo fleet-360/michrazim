@@ -74,9 +74,11 @@ const ComparableSchema = new Schema(
     floor: Number,
     yearBuilt: Number,
     propertyType: String,
+    // Registered closed transaction (עסקה שבוצעה) vs live asking price (מחיר מבוקש).
+    priceBasis: { type: String, enum: ["closed", "asking"], default: "closed" },
     source: { type: String, enum: ["live", "mock", "web"], default: "mock" },
     // Provenance for web-agent enriched deals (smart enrichment layer).
-    sourceKind: String, // "nadlan" | "madlan" | "govmap" | "yad2" | "web"
+    sourceKind: String, // "nadlan" | "madlan" | "komo" | "govmap" | "yad2" | "web"
     sourceUrl: String,
     quote: String, // verbatim snippet backing the row
   },

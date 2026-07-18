@@ -1,5 +1,6 @@
 import type { ParsedTender } from "@/lib/ai/insights";
 import type { PlanInfo } from "@/lib/data/iplan";
+import type { ComparableValuation } from "@/lib/data/comparable-valuation";
 import {
   curatePlans,
   underwriteAssumptions,
@@ -37,7 +38,8 @@ export interface TenderLocationDTO {
 export interface TenderMarketDTO {
   city: string;
   avgPricePerSqm: number;
-  priceSource: "city-db" | "default";
+  /** "comparables" = proximity-weighted from real nearby closed deals (facts, not a guess). */
+  priceSource: "comparables" | "city-db" | "default";
   fees: {
     buildingFeePerSqm: number;
     sewageLevyPerSqm: number;
@@ -68,7 +70,7 @@ export interface TenderEstimateDTO {
   breakEvenLandValue?: number;
   houseSqm?: number;
   salePricePerSqmUsed: number;
-  salePriceSource: "ai" | "market-db" | "default";
+  salePriceSource: "comparables" | "ai" | "market-db" | "default";
   /** The buildable coefficient the model ACTUALLY used (may differ from the AI suggestion when solved from stated plot+units). */
   farUsed: number;
   /** Where farUsed came from: stated building rights, the tender's FAR, solved from stated plot+units, the AI layer, or a default. */
@@ -94,6 +96,8 @@ export interface TenderReportDTO {
   minPriceComparison: MinPriceComparisonDTO | null;
   /** Layer 5 — the analyst's prioritized read of THIS tender. */
   analyst: AnalystBrief | null;
+  /** The real nearby deals behind the sale-price anchor (facts, proximity-weighted). */
+  comparables?: ComparableValuation | null;
   warnings: string[];
 }
 
@@ -359,12 +363,17 @@ function buildEstimate(opts: {
 
   const typology = assumptions?.typology ?? inferTypology(tender);
   const marketAvg = market?.avgPricePerSqm;
-  const salePricePerSqm = assumptions?.salePricePerSqm ?? marketAvg ?? 26000;
-  const salePriceSource: TenderEstimateDTO["salePriceSource"] = assumptions
-    ? "ai"
-    : market?.priceSource === "city-db"
-      ? "market-db"
-      : "default";
+  // Real nearby comparables are FACTS — they take precedence over the AI's
+  // suggested price and over any city/default anchor. "The AI advises, real data rules."
+  const comparableAvg = market?.priceSource === "comparables" ? marketAvg : undefined;
+  const salePricePerSqm = comparableAvg ?? assumptions?.salePricePerSqm ?? marketAvg ?? 26000;
+  const salePriceSource: TenderEstimateDTO["salePriceSource"] = comparableAvg
+    ? "comparables"
+    : assumptions
+      ? "ai"
+      : market?.priceSource === "city-db"
+        ? "market-db"
+        : "default";
 
   if (typology === "SINGLE_FAMILY") return buildSingleFamilyEstimate(opts, salePricePerSqm, salePriceSource);
 

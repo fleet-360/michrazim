@@ -57,6 +57,7 @@ export async function persistDealsToComparables(
       floor: d.floor,
       yearBuilt: d.yearBuilt,
       propertyType: d.assetType ?? "דירה",
+      priceBasis: d.priceBasis ?? "closed",
       source: "web",
       sourceKind: f.source,
       sourceUrl: f.sourceUrl,

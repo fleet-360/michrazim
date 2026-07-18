@@ -21,6 +21,7 @@ import {
   type PlanInfo,
 } from "@/lib/data/iplan";
 import { fetchParcelByGushHelka, govmapGeocode } from "@/lib/data/govmap";
+import { estimateComparableValue, type ComparableValuation } from "@/lib/data/comparable-valuation";
 import { EnrichmentJob } from "./models-enrich";
 import type { ParcelIdentity as EnrichParcelIdentity, EnrichmentResult } from "@/lib/enrich/types";
 import type { DealInputs, Track } from "@/lib/engine/types";
@@ -33,7 +34,7 @@ import {
 
 /** Only allow same-origin relative redirects (guard against open-redirect). */
 function safeNext(next: string): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/home";
 }
 
 export async function loginAction(_prev: unknown, formData: FormData) {
@@ -354,6 +355,32 @@ export async function analyzeTenderUploadAction(input: {
     warnings.push("נתוני השוק והאגרות אינם זמינים כרגע");
   }
 
+  // 4b. Fact-based sale-price anchor: proximity-weighted from REAL nearby closed
+  //     deals (govmap/רשות המיסים). This replaces the guessed default anchor —
+  //     when close comparables exist we use them; otherwise we keep the city
+  //     figure and never invent a price.
+  let comparables: ComparableValuation | null = null;
+  try {
+    if (location && tender.city) {
+      comparables = await estimateComparableValue({
+        lat: location.lat,
+        lng: location.lng,
+        gush: tender.gush,
+        helka: tender.helka,
+        city: tender.city,
+        site: tender.site,
+      });
+      if (comparables && market) {
+        market = { ...market, avgPricePerSqm: comparables.pricePerSqm, priceSource: "comparables" };
+        warnings.push(
+          `מחיר המכירה מבוסס על ${comparables.sampleSize} עסקאות אמת מהאזור (הקרובה ${comparables.nearestMeters} מ׳, ודאות ${comparables.confidence})`,
+        );
+      }
+    }
+  } catch (e) {
+    console.error("comparable valuation failed:", e);
+  }
+
   // 5. Multi-layer AI intelligence: plan curation → underwriting assumptions →
   //    typology-aware economic estimate → critic review + min-price comparison.
   let cities: Awaited<ReturnType<typeof getCities>> = [];
@@ -395,6 +422,7 @@ export async function analyzeTenderUploadAction(input: {
       review: intelligence.review,
       minPriceComparison: intelligence.minPriceComparison,
       analyst: intelligence.analyst,
+      comparables,
       warnings,
     },
   };
@@ -708,9 +736,28 @@ async function createImportedProject(opts: CreateImportedOpts): Promise<string> 
   const session = await getSession();
   const cities = await getCities();
   const cityRow = cities.find((c) => c.name === opts.city);
-  const avgPrice = cityRow?.avgResidentialPricePerSqm ?? 26000;
   const units = Math.max(8, opts.units || 60);
   const plotAreaSqm = derivePlotForUnits(units, opts.far);
+  // precise (neighborhood/address) coordinate via GovMap, falling back to the city centroid
+  const geo = await geocodeTenderPoint({
+    city: opts.city,
+    site: opts.site,
+    name: opts.name,
+    semelYeshuv: opts.semelYeshuv,
+  });
+  // Sale-price anchor: real proximity-weighted comparables when the location is
+  // precise, else the city figure, else a flagged default (never a bare guess).
+  let avgPrice = cityRow?.avgResidentialPricePerSqm ?? 26000;
+  if (geo?.precise) {
+    const cv = await estimateComparableValue({
+      lat: geo.lat,
+      lng: geo.lng,
+      city: opts.city,
+      site: opts.site,
+      assetType: opts.track === "URBAN_RENEWAL" ? "residential" : undefined,
+    }).catch(() => null);
+    if (cv) avgPrice = cv.pricePerSqm;
+  }
   const inputs = buildInputsFromTemplate({
     track: opts.track,
     city: opts.city,
@@ -720,13 +767,6 @@ async function createImportedProject(opts: CreateImportedOpts): Promise<string> 
     existingUnits: opts.existingUnits && opts.existingUnits > 0 ? opts.existingUnits : undefined,
   });
   if (opts.developCost && opts.developCost > 0) inputs.developmentCostsRMI = opts.developCost;
-  // precise (neighborhood/address) coordinate via GovMap, falling back to the city centroid
-  const geo = await geocodeTenderPoint({
-    city: opts.city,
-    site: opts.site,
-    name: opts.name,
-    semelYeshuv: opts.semelYeshuv,
-  });
   const created = await Project.create({
     name: opts.name,
     track: opts.track,

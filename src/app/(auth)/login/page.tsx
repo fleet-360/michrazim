@@ -18,7 +18,7 @@ export default async function LoginPage({
   const safeNext =
     next && next.startsWith("/") && !next.startsWith("//")
       ? next
-      : "/dashboard";
+      : "/home";
   const session = await getSession();
   if (session) redirect(safeNext);
 

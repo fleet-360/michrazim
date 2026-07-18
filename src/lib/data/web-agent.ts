@@ -4,12 +4,17 @@ import type { ParcelIdentity, EnrichSourceKind, FactCard, DealFact } from "@/lib
 import { DEAL_SITES, validateDeals, type AgentDeal } from "./deal-validate";
 
 /**
- * Hosts the web agent is allowed to search/fetch. Narrowed to madlan — the only
- * deal site whose pages web_fetch can actually read. nadlan is served separately
- * (official area JSON + optional local browser), and govmap/yad2 are JS shells /
- * bot-walls, so including them only wasted turns and produced noise warnings.
+ * Hosts the web agent is allowed to search/fetch. Chosen empirically (probe:
+ * scripts/qa-loop/probe-il-deal-sources) for sources whose pages web_fetch can
+ * actually READ (server-rendered, no JS shell / bot-wall):
+ *   - komo.co.il       — plain server-rendered listing board, highest yield (asking prices)
+ *   - project-tlv.info — readable blog of CLOSED deals with dates (Tel Aviv area)
+ *   - madlan.co.il     — Anthropic web_fetch reads it (closed "שנמכרו" + asking pages)
+ * Excluded (bot-walls / JS shells that returned nothing): yad2 (Radware),
+ * govmap/nadlan.gov.il (client-rendered SPA), homeless/onmap/winwin. nadlan's
+ * official AREA medians are served separately (nadlan-area.ts, reCAPTCHA-free).
  */
-const WEB_AGENT_HOSTS = ["madlan.co.il"];
+const WEB_AGENT_HOSTS = ["komo.co.il", "project-tlv.info", "madlan.co.il"];
 
 /**
  * Pluggable web-navigation fetcher. The default implementation drives Anthropic's
@@ -31,25 +36,30 @@ export interface WebAgentFetcher {
 
 export { DEAL_SITES };
 
-function buildSystemPrompt(sitePriority: EnrichSourceKind[]): string {
-  const order = sitePriority
-    .map((k) => DEAL_SITES.find((s) => s.kind === k)?.label ?? k)
-    .join(" → ");
+function buildSystemPrompt(_sitePriority: EnrichSourceKind[]): string {
   return `אתה סוכן איסוף עסקאות נדל"ן אמיתיות עבור חיתום מכרז. יש לך כלי web_search ו-web_fetch.
 
-המשימה: למצוא עסקאות נדל"ן אמיתיות שבוצעו באזור הנכס (לפי גוש/חלקה, שכונה או עיר).
+המשימה: לאסוף כמה שיותר עסקאות/מחירי נדל"ן אמיתיים מאזור הנכס (לפי שכונה/עיר), עם מקור וציטוט לכל אחת.
+
+מקורות מותרים וקריאים (לפי סדר עדיפות ותשואה):
+1. קומו (komo.co.il) — לוח מודעות מכירה שנטען כ-HTML רגיל (מחירים מבוקשים). זו הבארה הראשית — שלוף ישירות עמודי עיר שלמים:
+   https://www.komo.co.il/code/nadlan/apartments-for-sale.asp?nehes=1&cityName=<שם העיר בעברית מקודד ב-URL>
+   nehes=1 דירות · nehes=5 בתים/וילות · nehes=23 מגרשים. שלוף עד שלושה עמודי עיר (nehes=1,5,23). אל תשתמש בפילטר neighborhoodNum — שם התוצאות מתרוקנות. כל כרטיס מכיל מחיר + חדרים + מ"ר + רחוב.
+2. project-tlv.info/sold/ — בלוג עסקאות שנסגרו (עם תאריך) באזור תל אביב. שלוף אותו לעסקאות סגורות אמיתיות.
+3. מדלן (madlan.co.il) — עמודי "מחירי דירות שנמכרו" (סגורות) ועמודי "למכירה" (מבוקש).
 
 שיטת עבודה מחייבת:
-1. השתמש ב-web_search כדי לאתר עמודים באתרי העסקאות. סדר עדיפות: ${order}.
-2. השתמש ב-web_fetch כדי לפתוח את עמוד התוצאה עצמו ולקרוא את תוכנו.
-3. חלץ אך ורק עסקאות שמופיעות מילולית בעמוד שנשלף. לכל עסקה שמור את כתובת ה-URL של העמוד ואת הציטוט המילולי (טקסט השורה כפי שהוא מופיע).
-4. אסור להמציא עסקאות, אסור לממצע, אסור להשלים שדות שלא מופיעים. אם שדה חסר — השמט אותו.
-5. אם אתר חוסם גישה או לא מחזיר תוצאות — עבור לאתר הבא בסדר העדיפות, וציין זאת.
-6. עצור אחרי שאספת עד ~15 עסקאות רלוונטיות או מיצית את המקורות.
+1. השתמש ב-web_search לאיתור העמוד הנכון, ואז ב-web_fetch כדי לפתוח ולקרוא את תוכנו בפועל. לקומו אפשר גם לשלוף את תבנית ה-URL ישירות בלי חיפוש.
+2. חלץ אך ורק שורות שמופיעות מילולית בעמוד שנשלף. לכל שורה שמור sourceUrl + ציטוט מילולי.
+3. סווג כל רשומה בשדה priceBasis: "closed" לעסקה שבוצעה בפועל (עמודי "שנמכרו"/deals/sold, project-tlv, רשות המיסים) או "asking" למחיר מבוקש ממודעה חיה (קומו, עמודי "למכירה"). זה קריטי — מחיר מבוקש גבוה ממחיר עסקה.
+4. אסור להמציא, לממצע, או להשלים שדות חסרים. אם שדה חסר — השמט אותו.
+5. בקרת שפיות על שטח: דחה כרטיס שבו המ"ר לא סביר למספר החדרים (למשל "2 חדרים / 506 מ\"ר" = טעות מוכר) — אל תכלול אותו.
+6. אם אזור פריפריאלי/שכונה חדשה מחזיר מעט או כלום — אל תבזבז תורים, ציין זאת ב-blocked ועצור.
+7. עצור אחרי שאספת עד ~25 רשומות רלוונטיות או מיצית את המקורות.
 
 בסיום החזר JSON תקין בלבד (ללא טקסט נוסף):
-{"deals":[{"address","neighborhood","city","gush","helka","dealDate","totalPrice","sizeSqm","pricePerSqm","rooms","floor","yearBuilt","assetType","sourceUrl","quote"}],"blocked":["שם אתר שחסם/היה ריק"]}
-מחירים ושטחים כמספרים נקיים; תאריכים YYYY-MM-DD או MM/YYYY; gush/helka כמחרוזות.`;
+{"deals":[{"address","neighborhood","city","gush","helka","dealDate","totalPrice","sizeSqm","pricePerSqm","rooms","floor","yearBuilt","assetType","priceBasis","sourceUrl","quote"}],"blocked":["שם אתר/אזור שלא החזיר תוצאות"]}
+מחירים ושטחים כמספרים נקיים; תאריכים YYYY-MM-DD או MM/YYYY; gush/helka כמחרוזות; priceBasis הוא "closed" או "asking".`;
 }
 
 function buildUserPrompt(identity: ParcelIdentity, query?: string): string {
@@ -90,13 +100,13 @@ export function anthropicWebAgent(): WebAgentFetcher {
         {
           type: "web_search_20260209",
           name: "web_search",
-          max_uses: 8,
+          max_uses: 12,
           allowed_domains: WEB_AGENT_HOSTS,
         },
         {
           type: "web_fetch_20260209",
           name: "web_fetch",
-          max_uses: 12,
+          max_uses: 18,
           allowed_domains: WEB_AGENT_HOSTS,
           max_content_tokens: 30_000,
         },
@@ -107,8 +117,8 @@ export function anthropicWebAgent(): WebAgentFetcher {
         system: buildSystemPrompt(sitePriority),
         user: buildUserPrompt(identity, query),
         tools,
-        maxTokens: 8000,
-        maxTurns: 14,
+        maxTokens: 10_000,
+        maxTurns: 20,
         deadlineMs,
         onToolEvent: (name, brief) =>
           onProgress?.(name === "web_search" ? `חיפוש: ${brief}` : `שולף עמוד: ${brief}`),
@@ -117,7 +127,9 @@ export function anthropicWebAgent(): WebAgentFetcher {
         return { facts: [], warnings: ["סוכן החיפוש נכשל — לא אותרו עסקאות"] };
       }
       const parsed = extractDealsJson(res.finalText);
-      for (const b of parsed?.blocked ?? []) warnings.push(`מקור חסום/ריק: ${b}`);
+      // Neutral wording — a source with no rows for this area is coverage info,
+      // not a scary "blocked" alarm.
+      for (const b of parsed?.blocked ?? []) warnings.push(`לא נמצאו עסקאות ב-${b}`);
       const facts = validateDeals(parsed?.deals ?? [], res.fetchedUrls);
       onProgress?.(`אומתו ${facts.length} עסקאות מתוך המקורות`);
       if (facts.length === 0 && warnings.length === 0) {

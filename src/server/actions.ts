@@ -304,17 +304,22 @@ export async function analyzeTenderUploadAction(input: {
     // a centroid point-query returns citywide plans of the WRONG area, so pull
     // the neighborhood's own plans by name (XPlan names carry "שכ' X, עיר").
     if ((location?.origin === "city" || location?.origin === "plan") && tender.site && tender.city) {
-      const siteTerm = tender.site
+      const siteTerms = tender.site
         .replace(/\(.*?\)/g, " ")
-        .replace(/שכונת|השכונה|שכ'|רובע|אתר|מתחם/g, " ")
+        .replace(/שכונת|השכונה|שכ'|רובע|אתר|מתחם|קאנטרי/g, " ")
         .trim()
         .split(/\s+/)
-        .filter((w) => w.length >= 2)[0];
-      if (siteTerm) {
+        .filter((w) => w.length >= 2 && !/^[\d,'"-]+$/.test(w))
+        .slice(0, 2);
+      // Try each meaningful site token until one matches — "קאנטרי רמות"
+      // finds nothing for the first word but everything for "רמות".
+      for (const siteTerm of siteTerms) {
         const byName = await fetchPlansByName([siteTerm, tender.city]);
+        if (!byName.length) continue;
         const seen = new Set(plans.map((p) => p.planNumber));
         // Neighborhood plans first — they're the ones the tender lives in.
         plans = [...byName.filter((p) => !seen.has(p.planNumber)), ...plans].slice(0, 14);
+        break;
       }
     }
   } catch (e) {

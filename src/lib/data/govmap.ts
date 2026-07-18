@@ -106,7 +106,10 @@ export async function govmapObjectId(
   const q = query.trim();
   if (!q) return null;
   const data = await fetchDetailsByQuery(q);
-  const hit = data?.[bucket]?.find((h) => h.ObjectID !== undefined && String(h.ObjectID) !== "");
+  const hits = data?.[bucket]?.filter((h) => h.ObjectID !== undefined && String(h.ObjectID) !== "") ?? [];
+  // Prefer an exact-name hit: a prefix query like "נצרת" also matches
+  // "נצרת עילית", and taking the first hit can key the WRONG city's data.
+  const hit = hits.find((h) => (h.ResultLable ?? "").trim() === q) ?? hits[0];
   if (!hit?.ObjectID) return null;
   const s = String(hit.ObjectID);
   return s.includes("|") ? s.split("|").pop() || s : s;

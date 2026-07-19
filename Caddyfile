@@ -1,0 +1,21 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	# Automatic HTTPS: Caddy requests/renews a Let's Encrypt certificate for
+	# $DOMAIN on first boot and keeps it renewed. $DOMAIN must resolve (A/AAAA
+	# record) to this VPS, and ports 80+443 must be reachable from the internet.
+	encode zstd gzip
+
+	reverse_proxy app:3000 {
+		header_up X-Real-IP {remote_host}
+		# Next.js supports streaming (RSC/loading.tsx) — never buffer responses.
+		flush_interval -1
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

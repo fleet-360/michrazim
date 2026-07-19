@@ -77,6 +77,48 @@ npm run build      # build פרודקשן מלא
 
 כל קלט הוא **התפלגות**; מונטה-קרלו מייצר התפלגות רווח, הסתברות הפסד, ומחיר הצעה ממושמע. ראו `src/lib/engine/`.
 
+## פריסה לפרודקשן — Docker + GitHub Actions + Caddy
+המערכת ארוזה ב-Docker (Next.js `standalone`) ונפרסת ל-VPS אוטומטית בכל push ל-`master`, מאחורי Caddy שמנפיק ומחדש תעודת HTTPS (Let's Encrypt) אוטומטית.
+
+**קבצים רלוונטיים:** `Dockerfile`, `docker-compose.yml`, `Caddyfile`, `.env.example`, `.github/workflows/deploy.yml`.
+
+### הכנת ה-VPS (חד-פעמי)
+1. התקינו Docker + Docker Compose plugin על ה-VPS.
+2. צרו משתמש פריסה עם מפתח SSH (למשל `deploy`), והוסיפו את המפתח הציבורי ל-`~/.ssh/authorized_keys` שלו.
+3. הצביעו רשומת DNS (A/AAAA) של הדומיין שלכם ל-IP של ה-VPS.
+4. צרו תיקיית פריסה, למשל `/opt/michrazim`, והעלו לתוכה `.env.example` בשם `.env`, ומלאו ערכים אמיתיים (`ANTHROPIC_API_KEY`, `AUTH_SECRET`, `DOMAIN`, `ACME_EMAIL` וכו'). קובץ ה-`.env` הזה **נשאר על השרת בלבד** ואינו נכנס ל-git.
+5. פתחו בפיירוול את הפורטים `22` (SSH), `80` ו-`443` (Caddy).
+
+### סודות ב-GitHub (Settings → Secrets and variables → Actions)
+| Secret | תיאור |
+|---|---|
+| `VPS_HOST` | IP או hostname של ה-VPS |
+| `VPS_USER` | משתמש ה-SSH (למשל `deploy`) |
+| `VPS_SSH_KEY` | המפתח הפרטי (תואם למפתח שהוספתם ל-`authorized_keys`) |
+| `VPS_PORT` | פורט SSH (אופציונלי, ברירת מחדל `22`) |
+| `VPS_DEPLOY_PATH` | הנתיב על ה-VPS, למשל `/opt/michrazim` |
+
+אופציונלי — Repository variable `NEXT_PUBLIC_MAPBOX_TOKEN` (טוקן `pk.` ציבורי) אם רוצים Mapbox מוטמע ב-build.
+
+### מה קורה בכל push
+1. `.github/workflows/deploy.yml` בונה את ה-Docker image ודוחף אותו ל-GitHub Container Registry (`ghcr.io`).
+2. מעלה את `docker-compose.yml` ו-`Caddyfile` המעודכנים ל-VPS.
+3. מתחבר ב-SSH, מריץ `docker compose pull && docker compose up -d`. Caddy מנפיק תעודת HTTPS אוטומטית בעלייה הראשונה (ומחדש אותה לבד לפני שהיא פגה).
+
+### פריסה ראשונה / ידנית
+```bash
+# בתיקיית הפריסה על ה-VPS, לאחר יצירת .env:
+docker compose pull
+docker compose up -d
+```
+
+### הזרעת נתונים (seed) מול פרודקשן
+ה-image הריצתי לא כולל את `tsx`/devDependencies. הריצו את הסיד מהמחשב שלכם דרך טאנל SSH למונגו על ה-VPS:
+```bash
+ssh -L 27017:localhost:27017 -N deploy@VPS_HOST   # בטרמינל נפרד
+MONGODB_URI=mongodb://127.0.0.1:27017/michrazim npm run seed
+```
+
 ## הערת אבטחה
 מפתח ה-Anthropic נשמר ב-`.env.local` (ב-`.gitignore`) בלבד. החליפו אותו לפני פריסה ציבורית.
 

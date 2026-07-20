@@ -1,0 +1,52 @@
+services:
+  app:
+    image: ${IMAGE:-ghcr.io/fleet-360/michrazim}:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "3000"
+    depends_on:
+      mongo:
+        condition: service_started
+    networks:
+      - internal
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    # Bound to loopback only: reachable from other containers on the "internal"
+    # network, and from the host itself via an SSH tunnel (see README) — never
+    # exposed to the public internet.
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:-example.com}
+      - ACME_EMAIL=${ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    networks:
+      - internal
+
+networks:
+  internal:
+
+volumes:
+  mongo-data:
+  caddy-data:
+  caddy-config:

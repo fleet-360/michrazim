@@ -1,0 +1,35 @@
+[
+  {
+    "doc": "תנאים כלליים",
+    "domain": "legal",
+    "candidates": [
+      {
+        "fieldKey": "base_index",
+        "value": "יש לקרוא סעיף 12.2 (עמוד 96)",
+        "rawQuote": "המדד הבסיסי/ שער הבסיס-המדד/שע״ח הקבוע בסעיף3לחוזה-מסמך4",
+        "page": 96,
+        "confidence": "medium"
+      },
+      {
+        "fieldKey": "determining_index",
+        "value": "יש לקרוא סעיף 12.2 (עמוד 96)",
+        "rawQuote": "המדד/השער החדש-המדד/ שע״ח הממוצע של החודש בו הסתיימה התקופה הקובעת",
+        "page": 96,
+        "confidence": "medium"
+      }
+    ]
+  },
+  {
+    "doc": "תנאים כלליים",
+    "domain": "costs",
+    "candidates": [
+      {
+        "fieldKey": "delay_compensation",
+        "value": "יש לקרוא סעיף 9.5 (עמוד 73)",
+        "rawQuote": "9.5פיצויים מוסכמים וקבועים מראש בגין איחורים",
+        "page": 73,
+        "confidence": "medium"
+      }
+    ]
+  }
+]

@@ -1,0 +1,14 @@
+E2E FAILED: page.waitForURL: Timeout 180000ms exceeded.
+=========================== logs ===========================
+waiting for navigation until "load"
+  navigated to "http://localhost:3000/home"
+  navigated to "http://localhost:3000/home"
+  navigated to "http://localhost:3000/home"
+  navigated to "http://localhost:3000/home"
+  navigated to "http://localhost:3000/home"
+  navigated to "http://localhost:3000/home"
+  navigated to "http://localhost:3000/home"
+============================================================
+    at main (C:\Users\myOffice\Desktop\projects\michrazim\scripts\qa-loop\inspect-soroka-e2e.ts:54:14) {
+  name: 'TimeoutError'
+}

@@ -20,6 +20,19 @@ function providerOrder(): AiProvider[] {
   return DEFAULT_PROVIDER === "grok" ? ["grok", "anthropic"] : ["anthropic", "grok"];
 }
 
+/**
+ * Calls whose user content carries document/image blocks prefer Anthropic
+ * (native PDF/image vision). Grok is still a valid fallback for PDFs — its
+ * request gets the locally-extracted text (see `toGrokText`) — but never a
+ * silent one that answers about a document it can't see.
+ */
+function hasNonTextBlocks(user: string | Anthropic.ContentBlockParam[]): boolean {
+  return (
+    typeof user !== "string" &&
+    user.some((b) => (b as { type?: string }).type !== "text")
+  );
+}
+
 /* ── Anthropic ──────────────────────────────────────────────────────────── */
 let client: Anthropic | null = null;
 export function getAnthropic(): Anthropic | null {
@@ -33,7 +46,9 @@ export const MODEL_FAST = process.env.ANTHROPIC_MODEL_FAST || "claude-sonnet-4-6
 /* ── Grok (xAI) — OpenAI-compatible REST, called over fetch (no extra dep) ── */
 const GROK_BASE = process.env.GROK_BASE_URL || "https://api.x.ai/v1";
 export const GROK_MODEL_SMART = process.env.GROK_MODEL_SMART || "grok-4";
-export const GROK_MODEL_FAST = process.env.GROK_MODEL_FAST || "grok-3-mini";
+// grok-4-fast: 2M-token context (fits huge extracted PDF texts) and cheaper
+// than grok-3-mini, whose 131K window chokes on long documents.
+export const GROK_MODEL_FAST = process.env.GROK_MODEL_FAST || "grok-4-fast-reasoning";
 export const GROK_ENABLED = () => Boolean(process.env.GROK_API_KEY);
 
 /** Map a requested Anthropic model tier onto the equivalent Grok model. */
@@ -44,13 +59,80 @@ function grokModelFor(model?: string): string {
 /** At least one provider is configured. */
 export const AI_ENABLED = () => Boolean(process.env.ANTHROPIC_API_KEY) || GROK_ENABLED();
 
-/** Flatten Anthropic content blocks to plain text for Grok (drops non-text blocks). */
-function toPlainText(user: string | Anthropic.ContentBlockParam[]): string {
+/* ── PDF → text for Grok ────────────────────────────────────────────────── */
+/**
+ * Grok's chat API has no document blocks, so PDFs are converted to page-marked
+ * plain text locally (unpdf/pdf.js). This also sidesteps Anthropic's ~100-page
+ * PDF limit for very long contracts. Cache keyed by a cheap content hash.
+ */
+const pdfTextCache = new Map<string, string>();
+
+/**
+ * Repair Hebrew mojibake left by broken font CMaps. Some Hebrew PDFs (e.g.
+ * legal contracts out of certain Word exports) map regular-nun to Latin ð in
+ * the ToUnicode table — "יוניון" extracts as "יוðיון". Only applied to text
+ * that actually contains Hebrew.
+ */
+function repairHebrewText(t: string): string {
+  if (!/[֐-׿]/.test(t)) return t;
+  return t.replace(/ð/g, "נ").replace(//gu, "•");
+}
+
+async function pdfBase64ToText(base64: string): Promise<string | null> {
+  const key = `${base64.length}:${base64.slice(0, 64)}:${base64.slice(-64)}`;
+  const hit = pdfTextCache.get(key);
+  if (hit !== undefined) return hit || null;
+  try {
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const bytes = Uint8Array.from(Buffer.from(base64, "base64"));
+    const pdf = await getDocumentProxy(bytes);
+    const { text } = await extractText(pdf, { mergePages: false });
+    const pages = (text as string[]).map((p, i) => `[עמוד ${i + 1}]\n${repairHebrewText(p.trim())}`);
+    let joined = pages.join("\n\n");
+    if (joined.length > 700_000) joined = joined.slice(0, 700_000) + "\n…(המסמך נחתך)";
+    pdfTextCache.set(key, joined);
+    if (pdfTextCache.size > 12) pdfTextCache.delete(pdfTextCache.keys().next().value!);
+    return joined || null;
+  } catch (e) {
+    console.error("[ai] pdf text extraction failed:", (e as Error).message);
+    pdfTextCache.set(key, "");
+    return null;
+  }
+}
+
+/**
+ * Flatten content blocks for Grok: text passes through, PDF documents become
+ * extracted page-marked text. Returns null when the content contained
+ * document/image blocks that could NOT be converted — calling the model about
+ * a document it never saw invites silent hallucination.
+ */
+async function toGrokText(user: string | Anthropic.ContentBlockParam[]): Promise<string | null> {
   if (typeof user === "string") return user;
-  return user
-    .map((b) => (b as { type?: string; text?: string }).type === "text" ? (b as { text?: string }).text ?? "" : "")
-    .filter(Boolean)
-    .join("\n");
+  const parts: string[] = [];
+  let unconverted = 0;
+  for (const b of user) {
+    const type = (b as { type?: string }).type;
+    if (type === "text") {
+      const t = (b as { text?: string }).text;
+      if (t) parts.push(t);
+      continue;
+    }
+    if (type === "document") {
+      const src = (b as { source?: { type?: string; media_type?: string; data?: string } }).source;
+      if (src?.type === "base64" && src.media_type === "application/pdf" && src.data) {
+        const txt = await pdfBase64ToText(src.data);
+        if (txt) {
+          parts.push(`תוכן המסמך (טקסט שחולץ מקובץ ה-PDF, עם סימוני עמודים):\n"""\n${txt}\n"""`);
+          continue;
+        }
+      }
+      unconverted++;
+      continue;
+    }
+    unconverted++; // images and anything else — no Grok path yet
+  }
+  if (unconverted > 0) return null;
+  return parts.filter(Boolean).join("\n\n");
 }
 
 /**
@@ -66,7 +148,8 @@ export async function complete(opts: {
   maxTokens?: number;
   temperature?: number;
 }): Promise<string | null> {
-  for (const provider of providerOrder()) {
+  const order: AiProvider[] = hasNonTextBlocks(opts.user) ? ["anthropic", "grok"] : providerOrder();
+  for (const provider of order) {
     const out = provider === "anthropic" ? await anthropicComplete(opts) : await grokComplete(opts);
     if (out !== null) return out;
   }
@@ -114,6 +197,11 @@ async function grokComplete(opts: {
   const key = process.env.GROK_API_KEY;
   if (!key) return null;
   try {
+    const userText = await toGrokText(opts.user);
+    if (userText === null) {
+      console.error("[ai:grok] skipped — content has document/image blocks Grok cannot see");
+      return null;
+    }
     const res = await fetch(`${GROK_BASE}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
@@ -122,7 +210,7 @@ async function grokComplete(opts: {
         max_tokens: opts.maxTokens ?? 1400,
         messages: [
           { role: "system", content: opts.system },
-          { role: "user", content: toPlainText(opts.user) },
+          { role: "user", content: userText },
         ],
         ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       }),

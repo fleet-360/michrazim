@@ -62,6 +62,8 @@ const FieldSpecSchema = new Schema(
     sheet: { type: String, required: true },
     labelCell: { type: String, required: true },
     valueCell: { type: String, required: true },
+    referenceCell: String,
+    notesCell: String,
     dataType: {
       type: String,
       enum: ["number", "currency", "percent", "text", "date", "boolean"],
@@ -139,6 +141,8 @@ const CustomJobSchema = new Schema(
           confidence: { type: String, enum: ["high", "medium", "low"] },
           conflict: { type: Boolean, default: false },
           conflictNote: String,
+          /** Clarification question surfaced by extraction (notes column). */
+          clarification: String,
           userEdited: { type: Boolean, default: false },
           filled: { type: Boolean, default: false },
         },

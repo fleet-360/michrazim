@@ -69,6 +69,7 @@ export interface JobResultDTO {
   confidence?: Confidence;
   conflict: boolean;
   conflictNote?: string;
+  clarification?: string;
   userEdited: boolean;
 }
 
@@ -181,6 +182,7 @@ function toJobDTO(
         confidence: r.confidence,
         conflict: Boolean(r.conflict),
         conflictNote: r.conflictNote,
+        clarification: r.clarification,
         userEdited: Boolean(r.userEdited),
       } satisfies JobResultDTO;
     })
@@ -605,6 +607,100 @@ export async function extractEvidenceAction(
   }
 }
 
+/**
+ * Gap pass — fields that ended the extraction phase with ZERO candidates
+ * across all sources get one focused retry per document. Small field lists
+ * concentrate the model's attention, recovering values a broad pass missed.
+ * New candidates merge into the existing (doc × domain) evidence record.
+ */
+export async function extractGapEvidenceAction(
+  jobId: string,
+  fileId: string,
+  mode: "gap" | "locate" = "gap",
+): Promise<{ fileId: string; missing: number; found: number } | AuthFail | Err> {
+  const owned = await ownedJob(jobId);
+  if (owned.fail) return owned.fail;
+  try {
+    const [file, template, evidence] = await Promise.all([
+      CustomFile.findOne({ _id: fileId, jobId: owned.job._id, kind: "document" }),
+      ExcelTemplate.findById(owned.job.templateId).lean(),
+      CustomEvidence.find({ jobId: owned.job._id }).lean(),
+    ]);
+    if (!file || !template) return { error: "קובץ או תבנית לא נמצאו" };
+    const covered = new Set<string>();
+    for (const ev of evidence) {
+      for (const c of (ev.candidates ?? []) as EvidenceCandidate[]) covered.add(c.fieldKey);
+    }
+    const missing = ((template as any).fields as FieldSpec[]).filter(
+      (f) => f.enabled && !covered.has(f.key),
+    );
+    if (!missing.length) return { fileId, missing: 0, found: 0 };
+
+    const block = fileContentBlock(file.mimeType, file.data.toString("base64"));
+    if (!block) return { error: "סוג קובץ לא נתמך" };
+    const docType = (file.classification?.docType ?? "other") as DocType;
+    const idn = (owned.job.identity ?? {}) as Record<string, string>;
+    const focusHint = [owned.job.name, idn.city && `עיר ${idn.city}`].filter(Boolean).join(", ");
+
+    const byDomain = new Map<FieldDomain, FieldSpec[]>();
+    for (const f of missing) {
+      const arr = byDomain.get(f.domain) ?? [];
+      arr.push(f);
+      byDomain.set(f.domain, arr);
+    }
+    let found = 0;
+    const stillMissing = new Set(missing.map((f) => f.key));
+    const persist = async (domain: FieldDomain, candidates: EvidenceCandidate[]) => {
+      found += candidates.length;
+      for (const c of candidates) stillMissing.delete(c.fieldKey);
+      const rec = await CustomEvidence.findOne({
+        jobId: owned.job._id,
+        domain,
+        sourceKind: "document",
+        fileId: file._id,
+      });
+      if (rec) {
+        rec.candidates = [...(rec.candidates ?? []), ...candidates];
+        rec.markModified("candidates");
+        await rec.save();
+      } else {
+        await CustomEvidence.create({
+          jobId: owned.job._id,
+          domain,
+          sourceKind: "document",
+          fileId: file._id,
+          candidates,
+          model: "fast",
+          ok: true,
+        });
+      }
+    };
+    for (const [domain, domFields] of byDomain) {
+      const left = mode === "locate" ? domFields.filter((f) => stillMissing.has(f.key)) : domFields;
+      if (!left.length) continue;
+      const candidates = await extractDomainEvidence({
+        block,
+        docType,
+        filename: file.filename,
+        domain,
+        fields: left,
+        focusHint: focusHint || undefined,
+        // "gap": dig-harder retry for values. "locate" (runs after every doc
+        // had its gap round): last resort — point at the governing clause,
+        // "יש לקרוא סעיף X (עמוד Y)", the way a human surveyor annotates.
+        secondPass: mode === "gap",
+        deep: true,
+        locatorPass: mode === "locate",
+      });
+      if (candidates?.length) await persist(domain, candidates);
+    }
+    return { fileId, missing: missing.length, found };
+  } catch (e) {
+    console.error("extractGapEvidenceAction failed:", e);
+    return { error: "מעבר ההשלמה נכשל" };
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Phase E — locate + live תב"ע enrichment                              */
 /* ------------------------------------------------------------------ */
@@ -860,6 +956,25 @@ export async function reconcileDomainAction(
             conflictNote: undefined,
           }));
 
+      // Deterministic guard: the AI reconcile must never silently drop a
+      // candidate-backed field — fall back to its highest-confidence candidate.
+      if (finals) {
+        const RANK = { high: 3, medium: 2, low: 1 } as const;
+        const decided = new Set(finals.map((f) => f.fieldKey));
+        for (const [fieldKey, arr] of byField) {
+          if (decided.has(fieldKey)) continue;
+          const best = [...arr].sort((a, b) => RANK[b.confidence] - RANK[a.confidence])[0];
+          finals.push({
+            fieldKey,
+            value: best.value,
+            sourceIndex: best.index,
+            confidence: best.confidence,
+            conflict: false,
+            conflictNote: undefined,
+          });
+        }
+      }
+
       if (finals) {
         const results = (owned.job.results ?? []).filter(
           (r: any) => !fieldKeys.has(r.fieldKey),
@@ -882,6 +997,7 @@ export async function reconcileDomainAction(
             confidence: f.confidence,
             conflict: f.conflict,
             conflictNote: f.conflictNote,
+            clarification: chosen?.note,
             userEdited: false,
             filled: false,
           });
@@ -947,12 +1063,40 @@ export async function fillExcelAction(
     if (!template || !excel) return { error: "קובץ המקור לא נמצא" };
     const fields = ((template as any).fields as FieldSpec[]).filter((f) => f.enabled);
     const byKey = new Map(fields.map((f) => [f.key, f]));
+    // Source-reference columns get "מסמך — עמוד N" alongside the value.
+    const docFiles = await CustomFile.find({ jobId: owned.job._id, kind: "document" })
+      .select("filename")
+      .lean();
+    // "תנאים מיוחדים- ביח בחירום-סורוקה - ... .pdf" → "תנאים מיוחדים" — the
+    // reference column wants the document's short name, the way a human writes
+    // "תנאים מיוחדים - עמוד 25", not the full filename.
+    const shortDocName = (filename: string) => {
+      const base = filename.replace(/\.(pdf|png|jpe?g)$/i, "").trim();
+      const head = base.split(/\s*[-–]\s*/)[0]?.trim();
+      return (head && head.length >= 4 ? head : base).slice(0, 40);
+    };
+    const docNameById = new Map(
+      docFiles.map((f: any) => [String(f._id), shortDocName(String(f.filename))]),
+    );
 
     const writes: CellWrite[] = [];
     for (const r of owned.job.results ?? []) {
       const spec = byKey.get(r.fieldKey);
       if (!spec || r.value === null || r.value === undefined || r.value === "") continue;
       writes.push({ sheet: spec.sheet, cellRef: spec.valueCell, value: r.value, dataType: spec.dataType });
+      if (spec.referenceCell && r.source?.kind === "document") {
+        const docName = r.source.fileId ? docNameById.get(String(r.source.fileId)) : undefined;
+        const refText = [docName, r.source.page ? `עמוד ${r.source.page}` : undefined]
+          .filter(Boolean)
+          .join(" — ");
+        if (refText) {
+          writes.push({ sheet: spec.sheet, cellRef: spec.referenceCell, value: refText, dataType: "text" });
+        }
+      }
+      const noteText = (r.conflict && r.conflictNote) || r.clarification;
+      if (spec.notesCell && noteText) {
+        writes.push({ sheet: spec.sheet, cellRef: spec.notesCell, value: noteText, dataType: "text" });
+      }
     }
     if (!writes.length) return { error: "אין ערכים למילוי" };
 

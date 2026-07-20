@@ -30,6 +30,7 @@ export interface ParcelIdentity {
 export type EnrichSourceKind =
   | "nadlan"
   | "madlan"
+  | "komo"
   | "govmap"
   | "yad2"
   | "iplan"
@@ -88,6 +89,13 @@ export interface DealFact {
   floor?: number;
   yearBuilt?: number;
   assetType?: string;
+  /**
+   * Whether the price is a registered CLOSED transaction (עסקה שבוצעה) or an
+   * ASKING price from a live listing (מחיר מבוקש). Asking prices run systematically
+   * higher than closed prices, so underwriting must not treat them interchangeably.
+   * Defaults to "closed" only when the source is a known deal registry.
+   */
+  priceBasis?: "closed" | "asking";
 }
 
 /** A single fact — NEVER a computed anchor. Always source-backed for web facts. */

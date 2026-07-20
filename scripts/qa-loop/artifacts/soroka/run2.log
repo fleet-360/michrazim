@@ -1,0 +1,228 @@
+════════ Phase A: ניתוח מבנה האקסל ════════
+  sheets: "Sheet1" (75r, truncated=false)
+  grid chars: 3317
+  drafts: 74 → valid: 74 (issues: 0)
+  fields: 74, domains: identity, timeline, other, rights, legal, prices, costs
+    project_name @B2 (identity) — שם הפרויקט
+    prepared_by @B3 (identity) — הוכן ע"י
+    preparation_date @B4 (timeline) — תאריך
+    status @B5 (other) — סטטוס
+    submitter @C7 (identity) — מגישת ההצעה
+    work_site @C8 (identity) — אתר העבודות
+    client_hp @C9 (identity) — מזמין + מספר ח.פ
+    supervisor @C10 (identity) — מפקח
+    architect @C11 (identity) — אדריכל
+    work_type @C12 (rights) — סוג העבודות
+    execution_team_threshold @C13 (legal) — תנאי סף צוות ביצוע
+    tender_type @C14 (legal) — סוג המכרז
+    additional_competition @C15 (legal) — הליך תחרותי נוסף
+    architect_safety_source @C16 (legal) — מקור אדריכל ויועץ בטיחות
+    included_consultants @C17 (legal) — רשימת יועצים כלולה
+    client_plans_commitment @C18 (legal) — התחייבויות תכניות משלימות
+    work_duration @C19 (timeline) — משך העבודות
+    contract_milestones @C20 (timeline) — אבני דרך חוזיות
+    contract_amount @C21 (prices) — סכום החוזה
+    measurement_paushali @C22 (rights) — מדידה/פאושלי
+    subcontractor_terms @C23 (legal) — תנאי קבלן משנה
+    plans @C24 (legal) — תוכניות
+    logs @C25 (legal) — יומנים
+    additional_fees @C26 (costs) — עמלות נוספות
+    indexation @C27 (legal) — הצמדה
+    base_index @C28 (legal) — מדד הבסיס
+    determining_index @C29 (legal) — המדד הקובע/החדש
+    retention @C30 (costs) — עיכבון
+    contractor_insurance @C31 (legal) — ביטוח ע. קבלניות
+    additional_insurance @C32 (legal) — דרישות ביטוח משלימות
+    additional_deductions @C33 (costs) — קיזוזים חוזיים נוספים
+    advance_payment @C34 (prices) — מקדמה
+    interim_payment_terms @C35 (legal) — תנאי תשלום חשבונות ביניים
+    interim_submission @C36 (legal) — אופן הגשת חשבון ביניים
+    approving_party @C37 (identity) — גורם מאשר חשבון
+    final_payment_terms @C38 (legal) — תנאי תשלום חשבון סופי
+    proposal_guarantee @C39 (legal) — ערבות הצעה
+    performance_guarantee @C40 (legal) — ערבות ביצוע
+    warranty_guarantee @C41 (legal) — ערבות בדק
+    warranty_periods @C42 (timeline) — תקופות הבדק
+    liability_period @C43 (timeline) — תקופת אחריות
+    change_instructions @C44 (legal) — הוראות שינויים
+    change_pricing @C45 (prices) — קביעת מחיר השינויים
+    scope_changes @C46 (rights) — הגדלה והקטנה היקף
+    paushal_scope @C47 (rights) — תכולת עבודה בפאושל
+    extension_rules @C48 (timeline) — הארכת משך ביצוע
+    delay_compensation @C49 (costs) — פיצוי בגין איחור
+    additional_liquidated_damages @C50 (costs) — פיצויים מוסכמים נוספים
+    security @C51 (legal) — שמירה
+    cleaning @C52 (legal) — ניקיון
+    signage @C53 (legal) — שילוט
+    supervisor_office @C54 (legal) — משרדי מפקח
+    work_hours_traffic @C55 (legal) — שעות עבודה והסדרי תנועה
+    water_electricity @C56 (costs) — מים וחשמל
+    lifts_cranes @C57 (rights) — מעליות/עגורנים/במות
+    fines @C58 (costs) — קנסות
+    permit_status @C59 (legal) — היתר בנייה
+    bank_accompaniment @C60 (legal) — ליווי בנקאי
+    form4_completion @C61 (legal) — טופס 4 ותעודת גמר
+    work_stoppage_compensation @C62 (legal) — הפסקות עבודה ופיצוי
+    control_change_restriction @C63 (legal) — הגבלה שינוי שליטה
+    lien_waiver @C64 (legal) — ויתור עיכבון
+    pledge_assignment @C65 (legal) — שעבוד/העברת הסכם
+    dispute_resolution @C66 (legal) — פתרון סכסוכים
+    arbitration_clause @C67 (legal) — סעיף בוררות
+    document_priority @C68 (legal) — סדר עדיפות מסמכים
+    employee_restriction @C69 (legal) — הגבלה העסקת עובדים
+    subcontractor_threshold @C70 (legal) — תנאי סף קבלני משנה
+    designated_subcontractors @C71 (legal) — קבלנים מוכתבים
+    other_contractors @C72 (legal) — התקשרויות קבלנים אחרים
+    safety_instructions @C73 (legal) — הוראות בטיחות
+    handover_completion @C74 (legal) — מסירת עבודה ותעודה
+    tests @C75 (legal) — בדיקות
+    quality_control @C76 (legal) — בקרת איכות
+
+════════ Phase C: סיווג מסמכים ════════
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqe24ajvCSVV779PoV7"}
+Warning: TT: undefined function: 21
+Warning: TT: undefined function: 21
+  תנאים מיוחדים: tender — הזמנה להגשת הצעות מחיר לעבודות שיקום חדרי ניתוח צפוניים בסורוקה
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqeUTqLt5tvfRh1RL3G"}
+  תנאים כלליים: contract — תנאי חוזה כלליים להתקשרויות עם קבלנים
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqfDuFqmcKmvU87ME5u"}
+Warning: TT: undefined function: 32
+Warning: TT: undefined function: 32
+Warning: TT: undefined function: 32
+Warning: TT: undefined function: 32
+  מפרט טכני: tender — מפרט טכני מלא להזמנת מכרז לבניית מתחם חדרי ניתוח צפוניים במרכז רפואי סורוקה
+
+════════ Phase D: חילוץ ראיות ════════
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqgQiATmjpTm9q2Hyif"}
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqgQtaQjogFVGLgk5ih"}
+  תנאים מיוחדים × timeline: 3 candidates (6s, 6 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqgpXdqhk8gu1SAE6LL"}
+  תנאים מיוחדים × identity: 3 candidates (8s, 8 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqgxtftGzDkp53gPju8"}
+  תנאים מיוחדים × other: 0 candidates (6s, 1 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqhExZLS96sUJohZoRp"}
+  תנאים מיוחדים × rights: 1 candidates (6s, 5 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqhQw68FMppcJ6MfJGc"}
+  תנאים מיוחדים × prices: 0 candidates (4s, 3 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqhke1ND15GMBX46qbK"}
+  תנאים מיוחדים × legal: 9 candidates (11s, 44 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqi3rbfawQJ1Ad2c4Z8"}
+  תנאים מיוחדים × costs: 2 candidates (9s, 7 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqiRiz9aeVBgkN74N4v"}
+  תנאים כלליים × identity: 0 candidates (9s, 8 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqijeFWQrpmRwPxuZ5K"}
+  תנאים כלליים × other: 1 candidates (9s, 1 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqjQ9WdwsD95MyZKHzZ"}
+  תנאים כלליים × timeline: 4 candidates (16s, 6 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqjah2DZoQAr9ZknYTh"}
+  תנאים כלליים × rights: 0 candidates (10s, 5 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqk6pzrkZ5BQ1e4fmQZ"}
+  תנאים כלליים × legal: 8 candidates (11s, 44 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqkQSAERdxNMmm7qiay"}
+  תנאים כלליים × prices: 0 candidates (7s, 3 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqke5hAFLttau8MZUiX"}
+  תנאים כלליים × costs: 0 candidates (7s, 7 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqksEi6ECLSTeSjs4Dg"}
+  מפרט טכני × identity: 3 candidates (17s, 8 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqmv4u1ZoixdfCsZL4S"}
+  מפרט טכני × timeline: 3 candidates (16s, 6 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqn5FoMBHrUKQk4raTj"}
+  מפרט טכני × other: 1 candidates (14s, 1 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqnxz3NY5rbJVphdSor"}
+  מפרט טכני × rights: 3 candidates (19s, 5 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqoTdyYuy9ZSTZ19X5E"}
+  מפרט טכני × prices: 0 candidates (14s, 3 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBqpX3dou4ZYgaF9Fox5"}
+  מפרט טכני × legal: 19 candidates (25s, 44 fields)
+  מפרט טכני × costs: 1 candidates (17s, 7 fields)
+
+════════ Phase F: יישוב והכרעה ════════
+  identity: 6 candidates → 3 finals (AI)
+  timeline: 10 candidates → 5 finals (AI)
+  other: 2 candidates → 1 finals (AI)
+  rights: 4 candidates → 3 finals (AI)
+  legal: 36 candidates → 26 finals (AI)
+  prices: 0 candidates
+  costs: 3 candidates → 2 finals (AI)
+
+════════ Phase G: מילוי האקסל ════════
+  writes: 77, filled: 77, skipped: 0
+  → scripts\qa-loop\artifacts\soroka\סקר חוזה - סורוקה — AI.xlsx
+
+════════ תוצאות ════════
+  ✓ B2 project_name: שיקום חדרי ניתוח צפוניים במ.ר סורוקה  [תנאים מיוחדים ע' 1]
+  ∅ B3 prepared_by: 
+  ✓ B4 preparation_date: 2026-01  [תנאים מיוחדים ע' 21]
+  ✓ B5 status: מהדורה מעודכנת לחודש פברואר 2022  ⚡סתירה בין גרסת פברואר 2022 לבין סטטוס מכרז ינואר 2026  [תנאים כלליים ע' 1]
+  ∅ C7 submitter: 
+  ✓ C8 work_site: בית חולים סורוקה  [תנאים מיוחדים ע' 6]
+  ✓ C9 client_hp: שירותי בריאות כללית 5899026114  [תנאים מיוחדים ע' 36]
+  ∅ C10 supervisor: 
+  ∅ C11 architect: 
+  ✓ C12 work_type: עבודות בינוי ומערכות אלקטרומכניות בשיקום חדרי ניתוח צפוניים  [תנאים מיוחדים ע' 1]
+  ✓ C13 execution_team_threshold: מהנדס בניין רשום + מנהל עבודה רשום, כל אחד עם 5 שנות ניסיון מוכח בעבודות דומות  [תנאים מיוחדים ע' 24]
+  ✓ C14 tender_type: הצעה זולה ביותר, כללית רשאית לפסול הצעה בלתי סבירה  [תנאים מיוחדים ע' 1]
+  ∅ C15 additional_competition: 
+  ∅ C16 architect_safety_source: 
+  ∅ C17 included_consultants: 
+  ∅ C18 client_plans_commitment: 
+  ✓ C19 work_duration: 7 חודשים קלנדריים מיום קבלת אישור המזמין להתחלת העבודות  [תנאים מיוחדים ע' 23]
+  ∅ C20 contract_milestones: 
+  ∅ C21 contract_amount: 
+  ✓ C22 measurement_paushali: מדידה  [מפרט טכני ע' 16]
+  ∅ C23 subcontractor_terms: 
+  ✓ C24 plans: תכניות ביצוע, AS MADE, shop drawings; עדכון תכנון לפי מציאות; אין תביעה בגין חוס  [מפרט טכני ע' 13]
+  ∅ C25 logs: 
+  ∅ C26 additional_fees: 
+  ✓ C27 indexation: לא ישולמו כל התייקרויות  [תנאים מיוחדים ע' 19]
+  ∅ C28 base_index: 
+  ∅ C29 determining_index: 
+  ∅ C30 retention: 
+  ✓ C31 contractor_insurance: פוליסת ביטוח עבודות קבלניות על ידי המזמין, הקבלן משלם השתתפות  [תנאים כלליים ע' 27]
+  ∅ C32 additional_insurance: 
+  ∅ C33 additional_deductions: 
+  ∅ C34 advance_payment: 
+  ✓ C35 interim_payment_terms: שוטף+93 יום לאחר מועד הגשת החשבון  ⚡סתירה בין 45 יום (תנאים מיוחדים) ל-שוטף+93 (תנאים כלליים)  [תנאים כלליים ע' 102]
+  ∅ C36 interim_submission: 
+  ∅ C37 approving_party: 
+  ✓ C38 final_payment_terms: שוטף+93 יום לאחר מועד הגשת החשבון הסופי  [תנאים כלליים ע' 102]
+  ∅ C39 proposal_guarantee: 
+  ✓ C40 performance_guarantee: ערבות ביצוע בנוסח נספח א1, ערוכה לטובת המזמין + משרד הבריאות  [תנאים מיוחדים ע' 26]
+  ✓ C41 warranty_guarantee: ערבות בדק 24 חודשים ממועד מסירת הפרויקט + ערבות בדק איטום  [תנאים מיוחדים ע' 26]
+  ✓ C42 warranty_periods: 24 חודשים ממועד מסירת הפרויקט למזמין  [תנאים מיוחדים ע' 27]
+  ✓ C43 liability_period: 2 שנים לרוב העבודות; 3 שנים למכונות/מנועים/דוודים/אספלט/פיתוח/כבישים/מדרכות; 5 ש  ⚡סתירה בין תנאים כלליים (מדורג) למפרט טכני (24 חודש).  [תנאים כלליים ע' 106]
+  ✓ C44 change_instructions: שינויים רק באישור מפקח; אין תביעה לשינוי מחירים בגין תכניות לא מושלמות  [מפרט טכני ע' 13]
+  ∅ C45 change_pricing: 
+  ∅ C46 scope_changes: 
+  ∅ C47 paushal_scope: 
+  ✓ C48 extension_rules: הקבלן רשאי להגיש בקשה לדחייה עקב כח עליון/עיכובים/הפסקה; בקשה עד ה-5 בכל חודש; ק  [תנאים כלליים ע' 76]
+  ∅ C49 delay_compensation: 
+  ∅ C50 additional_liquidated_damages: 
+  ✓ C51 security: שמירה על ציוד/חומרים/מבנים; הקבלן נושא בכל הפסד מגניבה/קלקול; אין אחריות למזמין  [מפרט טכני ע' 4]
+  ✓ C52 cleaning: הקבלן חייב בניקוי שוטף יומיומי ופינוי פסולת עד מסירה סופית  [תנאים כלליים ע' 55]
+  ✓ C53 signage: הקבלן יתקין שלט ראשי ושלטי בטיחות והכוונה לפי אישור המהנדס  [תנאים כלליים ע' 54]
+  ✓ C54 supervisor_office: מבנה 35 מ״ר, 2 חדרים, ציוד מלא (שולחנות, כסאות, מחשב, מדפסת, מזגן, לוח תכניות);   [מפרט טכני ע' 9]
+  ✓ C55 work_hours_traffic: עבודה בימי חול בלבד; אישור בכתב ללילה/שבת; תיאום נתיבי תנועה עם המפקח  [מפרט טכני ע' 6]
+  ✓ C56 water_electricity: הקבלן נושא בכל ההוצאות עבור השימוש השוטף במים וחשמל, התקנת ההתחברויות, הסרתן והח  [מפרט טכני ע' 5]
+  ✓ C57 lifts_cranes: מנופים ומעליות  [מפרט טכני ע' 8]
+  ✓ C58 fines: 2000  ⚡סתירה בין 500 ל-2000 לפיצויים מוסכמים בתנאים מיוחדים.  [תנאים מיוחדים ע' 26]
+  ✓ C59 permit_status: קבלן אחראי לקבלת טופס 4, טופס 5, אישור כבאות, פיקוד עורף, אינטגרציה  [מפרט טכני ע' 16]
+  ∅ C60 bank_accompaniment: 
+  ∅ C61 form4_completion: 
+  ∅ C62 work_stoppage_compensation: 
+  ∅ C63 control_change_restriction: 
+  ∅ C64 lien_waiver: 
+  ∅ C65 pledge_assignment: 
+  ✓ C66 dispute_resolution: סמכות ייחודית לבית המשפט המוסמך בתל אביב-יפו  [תנאים מיוחדים ע' 4]
+  ∅ C67 arbitration_clause: 
+  ✓ C68 document_priority: תנאים מיוחדים גוברים על תנאים כלליים במקרה סתירה  [תנאים מיוחדים ע' 23]
+  ✓ C69 employee_restriction: אין להעסיק עובדים ללא אישור מפקח; המפקח רשאי לדרוש החלפה ללא נימוק  [מפרט טכני ע' 112]
+  ✓ C70 subcontractor_threshold: קבלן משנה רשום ומסווג; 3 פרויקטים דומים ב-5 שנים; תעודת הסמכה להתקנת צנרת  [מפרט טכני ע' 29]
+  ✓ C71 designated_subcontractors: גילוי וכריזה - חברת אורד; חשמל - מפעל לוחות מאושר; בקרה - קבלן ממונה  [מפרט טכני ע' 99]
+  ✓ C72 other_contractors: קבלן ראשי נותן שירותים; תיאום עם קבלני מערכות וגמר; שירותים ללא תמורה נוספת  [מפרט טכני ע' 7]
+  ✓ C73 safety_instructions: הקבלן מבצע הבניה, חובה למנות מנהל עבודה + ממונה בטיחות, דו"ח בטיחות חודשי  [תנאים מיוחדים ע' 24]
+  ✓ C74 handover_completion: מסירה רק לאחר כל אישורי מכון התקנים, תעודות בדיקה ללא הערות; תנאי לתשלום חשבון ס  [מפרט טכני ע' 13]
+  ✓ C75 tests: בדיקות אש, אינטגרציה, תקינות מערכות, הצפה לאיטום, בדיקות חשמל, לחץ, תקני 921/122  [מפרט טכני ע' 12]
+  ✓ C76 quality_control: בקרת איכות בכל שלב; דוחות; אין התקדמות ללא דוח בודק/בקרת איכות; בדיקות I/O  [מפרט טכני ע' 55]
+
+  fields=74 finals=40 withValue=40 filledCells=77

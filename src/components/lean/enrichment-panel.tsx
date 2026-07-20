@@ -52,16 +52,29 @@ export function EnrichmentPanel({
       body: JSON.stringify({ jobId }),
     }).catch(() => null);
 
+    // Watchdog: the server run is capped at ~4.5 minutes — if the job never
+    // reaches a terminal state (e.g. the processing route died), stop the
+    // infinite spinner and let the user retry.
+    const startedAt = Date.now();
     pollRef.current = setInterval(async () => {
       const p = await pollDealEnrichmentAction(jobId);
-      if ("requireAuth" in p || "error" in p) return;
-      setProgress(p.progress ?? []);
-      if (p.status === "done" && p.result) {
-        setResult(p.result);
-        setStatus("done");
-        if (pollRef.current) clearInterval(pollRef.current);
-      } else if (p.status === "failed") {
-        setError(p.error || "ההעשרה נכשלה");
+      if (!("requireAuth" in p) && !("error" in p)) {
+        setProgress(p.progress ?? []);
+        if (p.status === "done" && p.result) {
+          setResult(p.result);
+          setStatus("done");
+          if (pollRef.current) clearInterval(pollRef.current);
+          return;
+        }
+        if (p.status === "failed") {
+          setError(p.error || "ההעשרה נכשלה");
+          setStatus("failed");
+          if (pollRef.current) clearInterval(pollRef.current);
+          return;
+        }
+      }
+      if (Date.now() - startedAt > 6 * 60 * 1000) {
+        setError("ההעשרה לא הסתיימה בזמן סביר — נסו שוב");
         setStatus("failed");
         if (pollRef.current) clearInterval(pollRef.current);
       }
@@ -90,8 +103,9 @@ export function EnrichmentPanel({
       {status === "idle" && (
         <>
           <p className="mb-4 text-sm text-muted-foreground">
-            סוכן AI ינווט באתרי הנדל״ן (רשות המיסים, מדלן, govmap, יד2) ויביא עסקאות אמיתיות
-            מהאזור — כל עסקה עם מקור וציטוט מילולי, ללא הערכות או ממוצעים. התהליך אוטונומי ואורך כמה דקות.
+            נשלוף עסקאות שבוצעו מהמרשם הרשמי (רשות המיסים דרך govmap) ונוסיף מחירי מבוקש מאתרי הנדל״ן
+            (קומו, מדלן ועוד) — כל רשומה עם מקור וציטוט, מסומנת כ״עסקה שבוצעה״ או ״מחיר מבוקש״, ללא הערכות
+            או ממוצעים. התהליך אוטונומי ואורך כמה דקות.
           </p>
           {loggedIn ? (
             <Button className="gap-2" onClick={start}>
@@ -224,10 +238,22 @@ function MarketCard({ fact }: { fact: FactCard }) {
 function DealRow({ fact }: { fact: FactCard }) {
   const d = fact.deal;
   if (!d) return null;
+  const asking = d.priceBasis === "asking";
   return (
     <li className="rounded-lg border border-border p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="text-sm font-medium text-foreground">
+        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <span
+            className={cn(
+              "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold",
+              asking
+                ? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400"
+                : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
+            )}
+            title={asking ? "מחיר מבוקש ממודעה חיה — גבוה בד״כ ממחיר עסקה" : "עסקה שנרשמה ברשות המיסים"}
+          >
+            {asking ? "מחיר מבוקש" : "עסקה שבוצעה"}
+          </span>
           {d.address || d.neighborhood || d.city || "עסקה"}
           {d.dealDate ? <span className="mr-2 text-xs text-muted-foreground">{d.dealDate}</span> : null}
         </span>

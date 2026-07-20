@@ -54,9 +54,15 @@ function coerce(
       const d = new Date(s);
       return isNaN(d.getTime()) ? s : d;
     }
-    case "boolean":
-      if (typeof value === "boolean") return value;
-      return /^(true|כן|1|yes)$/i.test(String(value).trim());
+    case "boolean": {
+      if (typeof value === "boolean") return value ? "כן" : "לא";
+      const s = String(value).trim();
+      // Bare yes/no normalizes to Hebrew; a richer answer ("כן — נדרש ...")
+      // carries real information and passes through untouched.
+      if (/^(true|כן|1|yes)$/i.test(s)) return "כן";
+      if (/^(false|לא|0|no)$/i.test(s)) return "לא";
+      return s;
+    }
     default:
       return typeof value === "number" ? value : String(value);
   }
@@ -94,7 +100,13 @@ export async function fillWorkbook(originalXlsx: Buffer, writes: CellWrite[]): P
       skipped.push({ cellRef: label, reason: "אין ערך למילוי" });
       continue;
     }
-    cell.value = coerce(w.value, w.dataType, (cell.numFmt ?? "").toString());
+    const coerced = coerce(w.value, w.dataType, (cell.numFmt ?? "").toString());
+    cell.value = coerced;
+    // A Date written into a General-format cell renders as a raw serial
+    // number (e.g. 46124) — give it a date format.
+    if (coerced instanceof Date && !/[dmy]/i.test((cell.numFmt ?? "").toString())) {
+      cell.numFmt = "dd/mm/yyyy";
+    }
     filled.push(label);
   }
 

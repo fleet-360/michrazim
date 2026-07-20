@@ -183,6 +183,12 @@ export function ResultsTable({ job, onJobUpdated }: { job: CustomJobDTO; onJobUp
                         {r.conflictNote}
                       </p>
                     )}
+                    {!r.conflict && r.clarification && (
+                      <p className="flex w-full items-start gap-1 text-xs text-muted-foreground">
+                        <AlertTriangle className="mt-0.5 size-3 shrink-0 opacity-60" />
+                        שאלת הבהרה: {r.clarification}
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>

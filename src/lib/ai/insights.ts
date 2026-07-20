@@ -221,11 +221,19 @@ name (כותרת המכרז), tenderId (מספר מכרז, למשל "ים/123/20
 חשוב: specialTrack — אם מוזכר "מחיר מטרה" / "מחיר למשתכן" / "דיור להשכרה" / "השכרה ארוכת טווח" בכל מקום בחוברת, חובה להחזיר את שם המסלול.`;
 
 function extractJsonObject(out: string): ParsedTender | null {
+  const json = out.slice(out.indexOf("{"), out.lastIndexOf("}") + 1);
   try {
-    const json = out.slice(out.indexOf("{"), out.lastIndexOf("}") + 1);
     return normalizeTender(JSON.parse(json) as ParsedTender);
   } catch {
-    return null;
+    // Hebrew abbreviations (מע"מ, יח"ד, תב"ע) leak unescaped quotes into JSON
+    // strings; a quote flanked by Hebrew letters is never JSON structure.
+    try {
+      const repaired = json.replace(/([֐-׿])"([֐-׿])/g, '$1\\"$2');
+      return normalizeTender(JSON.parse(repaired) as ParsedTender);
+    } catch {
+      console.error("[ai-insights] tender JSON parse failed, raw head:", out.slice(0, 220));
+      return null;
+    }
   }
 }
 

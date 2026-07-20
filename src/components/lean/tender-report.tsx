@@ -38,6 +38,7 @@ function Panel({ title, children, className }: { title: string; children: React.
 const ORIGIN_LABEL: Record<string, string> = {
   parcel: "חלקה מדויקת (רישום קדסטרי)",
   geocode: "איתור לפי כתובת/מתחם",
+  plan: "מרכז תחום התכנית (קו כחול)",
   city: "מרכז העיר — מיקום משוער",
 };
 
@@ -354,21 +355,24 @@ export function TenderReport({
         </Panel>
       )}
 
-      {/* 4b — smart enrichment: real area deals via web-navigation agent (offered) */}
-      <EnrichmentPanel
-        loggedIn={loggedIn}
-        identity={{
-          city: tender.city,
-          site: tender.site,
-          gush: tender.gush,
-          helka: tender.helka,
-          planNumber: tender.planNumber,
-          lat: location?.lat,
-          lng: location?.lng,
-          assetType:
-            estimate?.typology === "SINGLE_FAMILY" ? "single_family" : "residential",
-        }}
-      />
+      {/* 4b — smart enrichment: real area deals via web-navigation agent
+          (offered). Without a city there is nothing to search — hide it. */}
+      {tender.city && (
+        <EnrichmentPanel
+          loggedIn={loggedIn}
+          identity={{
+            city: tender.city,
+            site: tender.site,
+            gush: tender.gush,
+            helka: tender.helka,
+            planNumber: tender.planNumber,
+            lat: location?.lat,
+            lng: location?.lng,
+            assetType:
+              estimate?.typology === "SINGLE_FAMILY" ? "single_family" : "residential",
+          }}
+        />
+      )}
 
       {/* 5 — economic estimate (typology-aware, AI-grounded assumptions) */}
       {estimate && (
@@ -400,9 +404,15 @@ export function TenderReport({
                 <StatCard
                   label="מול מחיר המינימום"
                   value={
-                    minPriceComparison.headroom >= 0
-                      ? `+${formatPct(minPriceComparison.headroomPct, 0)}`
-                      : formatPct(minPriceComparison.headroomPct, 0)
+                    // Beyond ±10x the percentage stops being informative
+                    // ("-23,169%") — show a capped, readable form instead.
+                    Math.abs(minPriceComparison.headroomPct) > 10
+                      ? minPriceComparison.headroomPct > 0
+                        ? "פי +10"
+                        : "מתחת בהרבה"
+                      : minPriceComparison.headroom >= 0
+                        ? `+${formatPct(minPriceComparison.headroomPct, 0)}`
+                        : formatPct(minPriceComparison.headroomPct, 0)
                   }
                   sub={`מינימום ${formatShekelShort(minPriceComparison.minPrice)} · מרווח ${formatShekelShort(minPriceComparison.headroom)}`}
                   icon={TrendingUp}

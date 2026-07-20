@@ -10,11 +10,29 @@ import type { EnrichSourceKind, FactCard, DealFact } from "@/lib/enrich/types";
 export const DEAL_SITES: { kind: EnrichSourceKind; host: string; label: string }[] = [
   { kind: "nadlan", host: "nadlan.gov.il", label: "רשות המיסים (nadlan.gov.il)" },
   { kind: "madlan", host: "madlan.co.il", label: "מדלן" },
+  { kind: "komo", host: "komo.co.il", label: "קומו" },
+  { kind: "web", host: "project-tlv.info", label: "Project-TLV (עסקאות סגורות)" },
   { kind: "govmap", host: "govmap.gov.il", label: "govmap" },
   { kind: "yad2", host: "yad2.co.il", label: "יד2" },
 ];
 
 export const ALLOWED_HOSTS = [...DEAL_SITES.map((s) => s.host), "gov.il"];
+
+/**
+ * Default price basis by host when the agent didn't tag it. Deal registries and
+ * "sold" pages are CLOSED transactions; live listing boards are ASKING prices.
+ * Unknown web sources default to asking (the conservative choice — never let an
+ * untagged row inflate the closed-deal picture).
+ */
+export function inferPriceBasis(url?: string, tagged?: "closed" | "asking"): "closed" | "asking" {
+  if (tagged === "closed" || tagged === "asking") return tagged;
+  const h = hostOf(url ?? "") ?? "";
+  if (/(^|\.)nadlan\.gov\.il$|(^|\.)govmap\.gov\.il$/.test(h)) return "closed";
+  if (h === "project-tlv.info" || h.endsWith(".project-tlv.info")) return "closed";
+  // madlan carries both "שנמכרו" (closed) and "למכירה" (asking); without a tag
+  // we can't tell, so stay conservative.
+  return "asking";
+}
 
 export function hostOf(url: string): string | null {
   try {
@@ -59,6 +77,17 @@ export interface AgentDeal extends DealFact {
  * allowlisted sourceUrl, a real quote (≥8 chars), or a price signal. Derives
  * ₪/m² only from real fetched totalPrice/sizeSqm. Caps the result set.
  */
+/** "13/05/2026" / "2026-05-13" / "05/2026" → "5|2026" (month bucket for near-dup detection). */
+function monthOf(dateStr?: string): string {
+  const parts = (dateStr ?? "").split(/[./\-\s]+/).map((p) => parseInt(p, 10)).filter(Number.isFinite);
+  if (!parts.length) return dateStr ?? "";
+  const yearIdx = parts.findIndex((p) => p > 1900);
+  if (yearIdx === -1) return parts.join("|");
+  // Year-first (ISO): month follows the year. Year-last (he-IL): month precedes it.
+  const month = yearIdx === 0 ? parts[1] : parts[yearIdx - 1];
+  return `${month ?? ""}|${parts[yearIdx]}`;
+}
+
 export function validateDeals(raw: AgentDeal[], fallbackUrls: string[] = []): FactCard[] {
   const fetchedAt = new Date().toISOString();
   const out: FactCard[] = [];
@@ -84,6 +113,12 @@ export function validateDeals(raw: AgentDeal[], fallbackUrls: string[] = []): Fa
     const key = [d.gush, d.helka, d.dealDate, total, str(d.address)].join("|");
     if (seen.has(key)) continue;
     seen.add(key);
+    // Near-duplicate guard: the same flat re-listed with a slightly different
+    // price/date (same address + rooms + size within the same month) is one
+    // deal, not two. Different flats in one building differ in size/rooms.
+    const nearKey = [str(d.address), num(d.rooms), size, monthOf(str(d.dealDate))].join("|");
+    if (str(d.address) && size && seen.has(`near:${nearKey}`)) continue;
+    seen.add(`near:${nearKey}`);
 
     const deal: DealFact = {
       address: str(d.address),
@@ -99,6 +134,7 @@ export function validateDeals(raw: AgentDeal[], fallbackUrls: string[] = []): Fa
       floor: num(d.floor),
       yearBuilt: num(d.yearBuilt),
       assetType: str(d.assetType),
+      priceBasis: inferPriceBasis(sourceUrl, d.priceBasis),
     };
     out.push({
       taskId: "",

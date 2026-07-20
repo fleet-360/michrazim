@@ -106,7 +106,10 @@ export async function govmapObjectId(
   const q = query.trim();
   if (!q) return null;
   const data = await fetchDetailsByQuery(q);
-  const hit = data?.[bucket]?.find((h) => h.ObjectID !== undefined && String(h.ObjectID) !== "");
+  const hits = data?.[bucket]?.filter((h) => h.ObjectID !== undefined && String(h.ObjectID) !== "") ?? [];
+  // Prefer an exact-name hit: a prefix query like "נצרת" also matches
+  // "נצרת עילית", and taking the first hit can key the WRONG city's data.
+  const hit = hits.find((h) => (h.ResultLable ?? "").trim() === q) ?? hits[0];
   if (!hit?.ObjectID) return null;
   const s = String(hit.ObjectID);
   return s.includes("|") ? s.split("|").pop() || s : s;
@@ -197,12 +200,21 @@ export async function fetchParcelByGushHelka(
   if (parcelCache.has(key)) return parcelCache.get(key)!;
   const cql = encodeURIComponent(`GUSH_NUM=${gush} AND PARCEL=${helka}`);
   // GovMap's WFS returns geometry in EPSG:3857 — reproject to lng/lat.
-  const json = await safeJson<{
+  // The service routinely takes ~10s per request, so a 16s single shot was
+  // flaky — allow a longer window and one retry before giving up.
+  type ParcelWfs = {
     features?: { geometry?: { type?: string; coordinates?: number[][][] | number[][][][] } }[];
-  }>(GOVMAP_PARCEL_QUERY + cql, { timeoutMs: 16000 });
+  };
+  let json: ParcelWfs | null = null;
+  for (let attempt = 0; attempt < 2 && !json; attempt++) {
+    json = await safeJson<ParcelWfs>(GOVMAP_PARCEL_QUERY + cql, { timeoutMs: 30000 });
+  }
   const feat = json?.features?.[0]?.geometry;
   if (!feat?.coordinates) {
-    parcelCache.set(key, null);
+    // A fetch failure (timeout / network) is transient — don't poison the
+    // cache for the whole server session. Only cache "no such parcel" when
+    // the WFS actually answered.
+    if (json) parcelCache.set(key, null);
     return null;
   }
   // MultiPolygon → [[[ [x,y]... ]]]  ; Polygon → [[ [x,y]... ]]

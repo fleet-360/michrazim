@@ -13,8 +13,15 @@ import { analyzeProject, feeScheduleFor } from "./analysis";
 import { VIEW_COOKIE, VIEW_HOME, isViewMode, type ViewMode } from "@/lib/view-mode";
 import { riskAnalysis, answerQuestion, decisionReport, parseTenderText, parseTenderDocument, methodologyAssistant, parseDealsText, type ProjectMeta, type ParsedTender } from "@/lib/ai/insights";
 import { derivePlotForUnits } from "@/lib/import-derive";
-import { fetchPlansAtPoint, fetchPlansByNumber, type PlanInfo } from "@/lib/data/iplan";
+import {
+  fetchPlansAtPoint,
+  fetchPlansByNumber,
+  fetchPlansByName,
+  fetchPlanCenter,
+  type PlanInfo,
+} from "@/lib/data/iplan";
 import { fetchParcelByGushHelka, govmapGeocode } from "@/lib/data/govmap";
+import { estimateComparableValue, type ComparableValuation } from "@/lib/data/comparable-valuation";
 import { EnrichmentJob } from "./models-enrich";
 import type { ParcelIdentity as EnrichParcelIdentity, EnrichmentResult } from "@/lib/enrich/types";
 import type { DealInputs, Track } from "@/lib/engine/types";
@@ -27,7 +34,7 @@ import {
 
 /** Only allow same-origin relative redirects (guard against open-redirect). */
 function safeNext(next: string): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/home";
 }
 
 export async function loginAction(_prev: unknown, formData: FormData) {
@@ -211,6 +218,24 @@ export async function analyzeTenderUploadAction(input: {
   // 1. Parse — a failure here is a real error (nothing to report on), trial NOT burned.
   const tender = pdf ? await parseTenderDocument(pdf, text || undefined) : await parseTenderText(text);
   if (!tender) return { error: "לא הצלחתי לחלץ נתונים מהמכרז — נסו טקסט מפורט יותר" };
+  // A document with zero identifying tender signals (junk text, a bare
+  // contract) should say so honestly instead of rendering an empty report shell.
+  const hasTenderSignal = Boolean(
+    tender.city ||
+      tender.gush ||
+      tender.plotAreaSqm ||
+      tender.units ||
+      tender.minPrice ||
+      tender.planNumber ||
+      tender.tenderId ||
+      tender.developmentCost,
+  );
+  if (!hasTenderSignal) {
+    return {
+      error:
+        "המסמך לא נראה כמו חוברת מכרז — לא זוהו בו עיר, גוש/מגרש, יח״ד או מחירים. אם זהו חוזה או נספח, הדביקו גם את עמודי פרטי המכרז מהחוברת.",
+    };
+  }
 
   const warnings: string[] = [];
 
@@ -243,6 +268,21 @@ export async function analyzeTenderUploadAction(input: {
         };
       }
     }
+    // A stated plan number anchors the tender inside the plan's blue line —
+    // far better than a city centroid for the plans panel and the map pin.
+    if (!location && tender.planNumber) {
+      const center = await fetchPlanCenter(tender.planNumber);
+      if (center) {
+        location = {
+          lat: center.lat,
+          lng: center.lng,
+          origin: "plan",
+          gush: tender.gush,
+          helka: tender.helka,
+          label: `תחום תכנית ${tender.planNumber}`,
+        };
+      }
+    }
     if (!location && tender.city) {
       const c = geocodeCity(tender.city);
       if (c) location = { lat: c.lat, lng: c.lng, origin: "city", gush: tender.gush, helka: tender.helka };
@@ -260,6 +300,28 @@ export async function analyzeTenderUploadAction(input: {
       const byNumber = await fetchPlansByNumber(tender.planNumber);
       const seen = new Set(byNumber.map((p) => p.planNumber));
       plans = [...byNumber, ...plans.filter((p) => !seen.has(p.planNumber))];
+    }
+    // Imprecise location (city centroid / plan bbox) + a named neighborhood:
+    // a centroid point-query returns citywide plans of the WRONG area, so pull
+    // the neighborhood's own plans by name (XPlan names carry "שכ' X, עיר").
+    if ((location?.origin === "city" || location?.origin === "plan") && tender.site && tender.city) {
+      const siteTerms = tender.site
+        .replace(/\(.*?\)/g, " ")
+        .replace(/שכונת|השכונה|שכ'|רובע|אתר|מתחם|קאנטרי/g, " ")
+        .trim()
+        .split(/\s+/)
+        .filter((w) => w.length >= 2 && !/^[\d,'"-]+$/.test(w))
+        .slice(0, 2);
+      // Try each meaningful site token until one matches — "קאנטרי רמות"
+      // finds nothing for the first word but everything for "רמות".
+      for (const siteTerm of siteTerms) {
+        const byName = await fetchPlansByName([siteTerm, tender.city]);
+        if (!byName.length) continue;
+        const seen = new Set(plans.map((p) => p.planNumber));
+        // Neighborhood plans first — they're the ones the tender lives in.
+        plans = [...byName.filter((p) => !seen.has(p.planNumber)), ...plans].slice(0, 14);
+        break;
+      }
     }
   } catch (e) {
     console.error("xplan lookup failed:", e);
@@ -291,6 +353,32 @@ export async function analyzeTenderUploadAction(input: {
   } catch (e) {
     console.error("tender market context failed:", e);
     warnings.push("נתוני השוק והאגרות אינם זמינים כרגע");
+  }
+
+  // 4b. Fact-based sale-price anchor: proximity-weighted from REAL nearby closed
+  //     deals (govmap/רשות המיסים). This replaces the guessed default anchor —
+  //     when close comparables exist we use them; otherwise we keep the city
+  //     figure and never invent a price.
+  let comparables: ComparableValuation | null = null;
+  try {
+    if (location && tender.city) {
+      comparables = await estimateComparableValue({
+        lat: location.lat,
+        lng: location.lng,
+        gush: tender.gush,
+        helka: tender.helka,
+        city: tender.city,
+        site: tender.site,
+      });
+      if (comparables && market) {
+        market = { ...market, avgPricePerSqm: comparables.pricePerSqm, priceSource: "comparables" };
+        warnings.push(
+          `מחיר המכירה מבוסס על ${comparables.sampleSize} עסקאות אמת מהאזור (הקרובה ${comparables.nearestMeters} מ׳, ודאות ${comparables.confidence})`,
+        );
+      }
+    }
+  } catch (e) {
+    console.error("comparable valuation failed:", e);
   }
 
   // 5. Multi-layer AI intelligence: plan curation → underwriting assumptions →
@@ -334,6 +422,7 @@ export async function analyzeTenderUploadAction(input: {
       review: intelligence.review,
       minPriceComparison: intelligence.minPriceComparison,
       analyst: intelligence.analyst,
+      comparables,
       warnings,
     },
   };
@@ -647,9 +736,28 @@ async function createImportedProject(opts: CreateImportedOpts): Promise<string> 
   const session = await getSession();
   const cities = await getCities();
   const cityRow = cities.find((c) => c.name === opts.city);
-  const avgPrice = cityRow?.avgResidentialPricePerSqm ?? 26000;
   const units = Math.max(8, opts.units || 60);
   const plotAreaSqm = derivePlotForUnits(units, opts.far);
+  // precise (neighborhood/address) coordinate via GovMap, falling back to the city centroid
+  const geo = await geocodeTenderPoint({
+    city: opts.city,
+    site: opts.site,
+    name: opts.name,
+    semelYeshuv: opts.semelYeshuv,
+  });
+  // Sale-price anchor: real proximity-weighted comparables when the location is
+  // precise, else the city figure, else a flagged default (never a bare guess).
+  let avgPrice = cityRow?.avgResidentialPricePerSqm ?? 26000;
+  if (geo?.precise) {
+    const cv = await estimateComparableValue({
+      lat: geo.lat,
+      lng: geo.lng,
+      city: opts.city,
+      site: opts.site,
+      assetType: opts.track === "URBAN_RENEWAL" ? "residential" : undefined,
+    }).catch(() => null);
+    if (cv) avgPrice = cv.pricePerSqm;
+  }
   const inputs = buildInputsFromTemplate({
     track: opts.track,
     city: opts.city,
@@ -659,13 +767,6 @@ async function createImportedProject(opts: CreateImportedOpts): Promise<string> 
     existingUnits: opts.existingUnits && opts.existingUnits > 0 ? opts.existingUnits : undefined,
   });
   if (opts.developCost && opts.developCost > 0) inputs.developmentCostsRMI = opts.developCost;
-  // precise (neighborhood/address) coordinate via GovMap, falling back to the city centroid
-  const geo = await geocodeTenderPoint({
-    city: opts.city,
-    site: opts.site,
-    name: opts.name,
-    semelYeshuv: opts.semelYeshuv,
-  });
   const created = await Project.create({
     name: opts.name,
     track: opts.track,

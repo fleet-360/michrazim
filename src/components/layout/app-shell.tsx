@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/logo";
 import { SearchIcon } from "@/components/brand/search-icon";
 import {
-  IconDashboard, IconTender, IconCompare, IconMap, IconMarket, IconFees, IconIntegrations, IconNew,
+  IconHome, IconDashboard, IconTender, IconCompare, IconMap, IconMarket, IconFees, IconIntegrations, IconNew,
 } from "@/components/brand/icons";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
@@ -20,6 +20,7 @@ import type { Track } from "@/lib/engine/types";
 import { logoutAction } from "@/server/actions";
 
 const NAV = [
+  { href: "/home", label: "בית", icon: IconHome },
   { href: "/dashboard", label: "לוח בקרה", icon: IconDashboard },
   { href: "/tenders", label: "מכרזי רמ״י", icon: IconTender },
   { href: "/compare", label: "השוואת עסקאות", icon: IconCompare },
@@ -31,7 +32,7 @@ const NAV = [
 
 // compact set for the mobile bottom bar
 const MOBILE_NAV = [
-  { href: "/dashboard", label: "בקרה", icon: IconDashboard },
+  { href: "/home", label: "בית", icon: IconHome },
   { href: "/tenders", label: "מכרזים", icon: IconTender },
   { href: "/map", label: "מפה", icon: IconMap },
   { href: "/comparables", label: "שוק", icon: IconMarket },
@@ -47,10 +48,12 @@ interface ProjectLite {
 export function AppShell({
   user,
   projects = [],
+  viewMode = "home",
   children,
 }: {
   user: SessionUser | null;
   projects?: ProjectLite[];
+  viewMode?: "home" | "lean" | "full" | "custom";
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -61,7 +64,7 @@ export function AppShell({
       <div className="mx-auto flex min-h-screen w-full max-w-[1600px]">
         {/* Sidebar */}
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-white px-4 py-5 lg:flex dark:bg-background">
-          <Link href="/dashboard" className="px-2">
+          <Link href="/home" className="px-2">
             <Logo />
           </Link>
 
@@ -145,7 +148,7 @@ export function AppShell({
               <Button variant="ghost" size="icon" className="lg:hidden" aria-label="חיפוש" onClick={openCommand}>
                 <SearchIcon className="text-foreground" />
               </Button>
-              <ViewModeSwitcher current="full" className="ml-1 hidden sm:inline-flex" />
+              <ViewModeSwitcher current={viewMode} className="ml-1 hidden sm:inline-flex" />
               <ThemeToggle />
               {user ? (
                 <Button asChild variant="outline" size="sm" className="gap-2 lg:hidden">

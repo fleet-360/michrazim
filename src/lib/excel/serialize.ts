@@ -50,6 +50,17 @@ export interface FieldSpec {
   labelCell: string;
   /** The ANSWER cell the pipeline should write into, e.g. "C4". */
   valueCell: string;
+  /**
+   * Optional source-reference cell for the same row (a column headed
+   * "סעיף בהסכם"/"מקור"/"אסמכתא"): the pipeline writes WHERE the value came
+   * from (document + page/section) instead of treating it as a content field.
+   */
+  referenceCell?: string;
+  /**
+   * Optional notes cell for the same row (a column headed "שאלות הבהרה"/
+   * "הערות"): the pipeline writes conflict notes / open questions there.
+   */
+  notesCell?: string;
   dataType: FieldDataType;
   unit?: string;
   domain: FieldDomain;
@@ -57,10 +68,12 @@ export interface FieldSpec {
   enabled: boolean;
 }
 
-const MAX_ROWS = 80;
-const HEAD_ROWS = 60;
+// Real-world survey formats run past 100 rows — sample generously; the char
+// guard below still caps the payload for genuinely huge sheets.
+const MAX_ROWS = 160;
+const HEAD_ROWS = 95;
 const MAX_COLS = 26;
-const MAX_GRID_CHARS = 15_000;
+const MAX_GRID_CHARS = 22_000;
 
 /** "A"→1 … "Z"→26, "AA"→27. */
 export function colLetterToNumber(letters: string): number {
@@ -350,6 +363,26 @@ export function validateFieldSpecs(
         action: "dropped",
       });
       continue;
+    }
+
+    // referenceCell/notesCell are best-effort: strip when malformed, a formula
+    // cell, or colliding with the value cell — never drop the whole field.
+    for (const aux of ["referenceCell", "notesCell"] as const) {
+      const auxRefStr = fixed[aux];
+      if (!auxRefStr) continue;
+      const auxRef = parseCellRef(auxRefStr);
+      const bad =
+        !auxRef ||
+        auxRefStr === fixed.valueCell ||
+        isFormulaCell(ws.getRow(auxRef.row).getCell(auxRef.col));
+      if (bad) {
+        issues.push({
+          key: spec.key,
+          problem: `תא עזר "${auxRefStr}" לא תקין — הוסר`,
+          action: "downgraded",
+        });
+        fixed = { ...fixed, [aux]: undefined };
+      }
     }
 
     // Duplicate value cells: keep the more confident one.

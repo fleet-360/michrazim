@@ -1,0 +1,220 @@
+════════ Phase A: ניתוח מבנה האקסל ════════
+  sheets: "סקר חוזה" (111r, truncated=false)
+  grid chars: 4479
+  (cached) fields: 80
+  fields: 80, domains: identity, legal, other, timeline, prices, costs
+    tender_name @C2 (identity) — שם המכרז
+    project_description @C4 (identity) — תיאור הפרויקט
+    contractor_classification @D5 (legal) — סיווג קבלני
+    contractor_tour_representative @D6 (other) — נציג בסיור קבלנים
+    contractors_in_tour @D7 (other) — קבלנים משתתפים בסיור
+    submission_date @D8 (timeline) — מועד הגשה
+    price_uniformity @D9 (prices) — אחידות במחירים
+    tender_law_applicability @D10 (legal) — תחולת דיני המכרזים ושמירת זכויות
+    client_contact @D12 (identity) — מזמין
+    supervision_contact @D13 (identity) — ניהול/פיקוח
+    structural_engineer @D14 (identity) — מתכנן קונס'
+    architect @D15 (identity) — מתכנן אדר'
+    mechanical_engineer @D16 (identity) — מתכנן אינס'
+    hvac_engineer @D17 (identity) — מתכנן מיזוג אוויר
+    electrical_engineer @D18 (identity) — מתכנן חשמל
+    elevator_consultant @D19 (identity) — יועץ מעליות
+    aluminum_consultant @D20 (identity) — יועץ אלומיניום
+    landscape_architect @D21 (identity) — אדריכלות נוף / פיתוח
+    waterproofing_consultant @D22 (identity) — איטום
+    additional_notes_contacts @D23 (other) — הערות נוספות
+    threshold_conditions @D25 (legal) — תנאי סף
+    special_submission_requirements @D26 (legal) — דרישות מיוחדות להגשה
+    tender_deposit @D27 (legal) — ערבות מכרז
+    execution_duration @D29 (timeline) — משך ביצוע
+    milestone_schedule @D30 (timeline) — לו"ז עקרוני / אבני דרך
+    external_schedule_management @D31 (timeline) — דרישה לניהול לוח זמנים חיצוני
+    work_stoppage @D32 (legal) — הפסקת עבודה
+    general_penalties @D34 (costs) — קנסות כלליים
+    delay_compensation @D35 (costs) — פיצוי בגין איחור בלו"ז
+    fundamental_breach_compensation @D36 (costs) — פיצוי בגין הפרה יסודית
+    payment_method @D37 (costs) — אופן התשלום - מדידה/פאושלי/אבני דרך
+    partial_account_payment @D38 (costs) — שוטף לחשבונות חלקיים
+    partial_account_submission_date @D39 (timeline) — מועד הגשת חשבון חלקי
+    final_account_payment @D40 (costs) — שוטף לחשבון סופי
+    indexation @D41 (costs) — התייקרויות (מדד)
+    base_index @D42 (costs) — המדד הבסיסי
+    insurance_note @D43 (legal) — ביטוח
+    advance_payment @D44 (costs) — מקדמה
+    deductions_retention @D45 (costs) — קיזוזים לחשבונות/ עכבון
+    performance_bond @D46 (legal) — ערבות ביצוע
+    warranty_bond @D48 (legal) — ערבות בדק ואחזקה
+    warranty_period @D49 (timeline) — תקופת הבדק והאחזקה
+    maintenance_reference @D50 (other) — התייחסות לאחזקה
+    warranty_payment @D51 (costs) — תשלום בגין בדק ואחזקה
+    daily_works @D54 (costs) — עבודות יומיות - רג'י
+    variation_assessment @D55 (costs) — הערכת שינויים
+    safety_contract_reference @D57 (legal) — התייחסות לבטיחות בחוזה
+    temporary_traffic_arrangements @D58 (other) — הסדרי תנועה זמניים
+    parking @D59 (other) — חניה
+    preliminary_site_tests @D60 (other) — דרישה לבדיקות מוקדמות באתר
+    site_preparation_works @D61 (other) — דרישה לעבודות הכנה באתר
+    permits_fees_payment @D62 (costs) — תשלום בגין רשיונות/אגרות/אחר
+    design_costs_contractor @D63 (costs) — הוצאות תכנון ע"ח הקבלן
+    nominated_subcontractors_profit @D65 (costs) — רווח על קבלנים מטעם המזמין
+    other_contractors_relation @D66 (other) — קשר עם קבלנים אחרים
+    main_contractor_services @D67 (other) — שירותי קבלן ראשי
+    site_conditions @D70 (other) — תנאי השטח
+    fencing_gates @D71 (other) — גידור ושערים
+    site_offices @D72 (other) — משרדי אתר ופיקוח
+    access_roads @D73 (other) — דרכי גישה
+    signage @D74 (other) — שילוט
+    security @D75 (other) — שמירה
+    temporary_water_electricity @D76 (other) — מים וחשמל זמני
+    temporary_sewage @D77 (other) — ביוב זמני
+    temporary_drainage @D78 (other) — ניקוז שטח זמני
+    additional_infrastructure @D79 (other) — תשתיות נוספות
+    cleaning @D80 (other) — ניקיון
+    project_documentation @D81 (other) — דרישה לצילום הפרויקט
+    site_team_requirements @D83 (other) — דרישות לצוות האתר
+    project_management_system @D84 (other) — מערכת לניהול פרויקטים
+    working_hours @D85 (other) — שעות עבודה
+    accompanying_lab @D86 (other) — מעבדה מלווה
+    security_personnel_classification @D88 (legal) — סיווג צוות קבלן ראשי
+    employee_security_classification @D89 (legal) — סיווג עובדים - לפי שלבי בנייה
+    access_control_requirements @D90 (legal) — דרישות בטחון לבקרת כניסה
+    worker_escort @D91 (legal) — ליווי עובדי קבלן
+    document_security @D92 (legal) — אבטחת מסמכים
+    security_officer @D93 (legal) — נאמן בטחון
+    systems_coordinator @D96 (other) — סופרפוזיציה/מתאם מערכות
+    bim_requirement @D97 (other) — BIM
+
+════════ Phase C: סיווג מסמכים ════════
+  (cached) מרלוג HM - הסכם קבלן ראשי.pdf: contract — הסכם קבלן ראשי לביצוע עבודות בפרויקט מרלו"ג H&M
+
+════════ Phase D: חילוץ ראיות ════════
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBu4BU9fMXQRsxkKgMpG"}
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBu4DEZhpAjTAH1VGAwH"}
+Warning: TT: undefined function: 21
+Warning: TT: undefined function: 21
+  הסכם קבלן ראשי × identity: 11 candidates (27s, 13 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBu6BDa44FmKhLkLiZ3m"}
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBu6KnWirHEqDBK3XWw2"}
+  הסכם קבלן ראשי × legal: 9 candidates (37s, 16 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBu6usckQD1cAMWQE7bF"}
+  הסכם קבלן ראשי × timeline: 5 candidates (14s, 6 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBu7y2A1SQKCrDhzXuiz"}
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBu85EDXDnAw9hxJmNSX"}
+  הסכם קבלן ראשי × prices: 1 candidates (13s, 1 fields)
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBu8w383qR78DsDL4kkw"}
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBu9fifC89tGxkZnCZdU"}
+  הסכם קבלן ראשי × other: 21 candidates (54s, 28 fields)
+  הסכם קבלן ראשי × costs: 8 candidates (18s, 16 fields)
+
+════════ Phase D2: מעבר השלמה ════════
+  missing fields: 25 — contractor_tour_representative, contractors_in_tour, aluminum_consultant, waterproofing_consultant, additional_notes_contacts, tender_deposit, fundamental_breach_compensation, partial_account_submission_date, base_index, advance_payment, maintenance_reference, warranty_payment, daily_works, variatio
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBuAH98S6bHpD3CQAVfY"}
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBuBFb94Q9qy11etvZxi"}
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBuBmG5wCmuE6MxnRRqW"}
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBuCA7WvsVKdFTAVjZLt"}
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBuCkuY9kv81Xc4zbnwA"}
+
+════════ Phase D3: איתור סעיפים ════════
+  still missing: 25 — contractor_tour_representative, contractors_in_tour, aluminum_consultant, waterproofing_consultant, additional_notes_contacts, tender_deposit, fundamental_breach_compensation, partial_account_submission_date, base_index, advance_payment, maintenance_
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBuDetupscMBe6eA7QFn"}
+  locate הסכם קבלן ראשי × other: +4 — contractors_in_tour@ע'151, contractor_tour_representative@ע'151, site_preparation_works@ע'20, preliminary_site_tests@ע'23
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBuEbCSC2gcRUNCm2ZtN"}
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBuF5YGHAg2RCvzq6FJV"}
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBuFbwrvMXgde1iHGSyN"}
+[ai:anthropic] completion failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CdBuGCjdpA185ooDySVKQ"}
+
+════════ Phase F: יישוב והכרעה ════════
+  identity: 11 candidates → 11 finals (det)
+  legal: 9 candidates → 9 finals (det)
+  other: 25 candidates → 25 finals (det)
+  timeline: 5 candidates → 5 finals (det)
+  prices: 1 candidates → 1 finals (det)
+  costs: 8 candidates → 8 finals (det)
+
+════════ Phase G: מילוי האקסל ════════
+  writes: 59, filled: 59, skipped: 0
+  → scripts\qa-loop\artifacts\hm\סקר חוזה - מרלוג HM — AI.xlsx
+
+════════ תוצאות ════════
+  ✓ C2 tender_name: מרלו"ג H&M  [הסכם קבלן ראשי ע' 4]
+  ✓ C4 project_description: הקמת מרכז לוגיסטי לחברת H&M בשטח של כ-15,000 מ"ר בפארק תעשיות יוניון ניר צבי, מו  [הסכם קבלן ראשי ע' 8]
+  ✓ D5 contractor_classification: ג'5 ענף ראשי בניה 100  [הסכם קבלן ראשי ע' 5]
+  ✓ D6 contractor_tour_representative: יש לקרוא סעיף נספחיד' (עמוד 151)  [הסכם קבלן ראשי ע' 151]
+  ✓ D7 contractors_in_tour: יש לקרוא סעיף נספחיד' (עמוד 151)  [הסכם קבלן ראשי ע' 151]
+  ✓ D8 submission_date: 2026-04-12  [הסכם קבלן ראשי ע' 5]
+  ✓ D9 price_uniformity: כן — אם סעיפים זהים בכתב הכמויות, יחול המחיר הנמוך מבין המחירים שננקבו (סעיף 7.1  [הסכם קבלן ראשי ע' 6]
+  ✓ D10 tender_law_applicability: לא — דיני המכרזים לא יחולו על הזמנה זו  [הסכם קבלן ראשי ע' 6]
+  ✓ D12 client_contact: יוניון פיתוח בע"מ, ח.פ. 515510576, רחוב יגאל אלון 67 ת"א  [הסכם קבלן ראשי ע' 7]
+  ✓ D13 supervision_contact: חברת וקסמן גרופ (וקסמן גוברין גבע) בע"מ  [הסכם קבלן ראשי ע' 8]
+  ✓ D14 structural_engineer: משרד מכלסון - נחום  [הסכם קבלן ראשי ע' 3]
+  ✓ D15 architect: משרד מושלי - אלדר  [הסכם קבלן ראשי ע' 3]
+  ✓ D16 mechanical_engineer: משרד נש מהנדסים  [הסכם קבלן ראשי ע' 3]
+  ✓ D17 hvac_engineer: משרד הררי  [הסכם קבלן ראשי ע' 3]
+  ✓ D18 electrical_engineer: משרד ר. כהן  [הסכם קבלן ראשי ע' 3]
+  ✓ D19 elevator_consultant: משרד אפיק  [הסכם קבלן ראשי ע' 3]
+  ∅ D20 aluminum_consultant: 
+  ✓ D21 landscape_architect: משרד עומר ינוביץ'  [הסכם קבלן ראשי ע' 3]
+  ∅ D22 waterproofing_consultant: 
+  ∅ D23 additional_notes_contacts: 
+  ✓ D25 threshold_conditions: קבלן רשום בסיווג ג'5 ענף 100, תעודת התאגדות, אישור מורשי חתימה  [הסכם קבלן ראשי ע' 5]
+  ✓ D26 special_submission_requirements: הצעה במעטפה סגורה, חתימה על כל דף, דיסק/מקוון עם כתב כמויות, תוקף 90 יום  [הסכם קבלן ראשי ע' 5]
+  ∅ D27 tender_deposit: 
+  ✓ D29 execution_duration: 24  [הסכם קבלן ראשי]
+  ✓ D30 milestone_schedule: לוח זמנים מפורט עם אבני דרך: התארגנות, עבודת עפר, שלד מחסן, שלד משרדים, קונסטרוק  [הסכם קבלן ראשי]
+  ✓ D31 external_schedule_management: כן — הקבלן מגיש לו"ז מפורט ב-MS Project תוך 35 יום לאישור המפקח, כולל עדכונים חו  [הסכם קבלן ראשי ע' 49]
+  ✓ D32 work_stoppage: המזמין רשאי להפסיק את ההתקשרות בכל עת ולפי שיקול דעתו  [הסכם קבלן ראשי ע' 15]
+  ✓ D34 general_penalties: 5,000 ₪ למקרה הפרת בטיחות  [הסכם קבלן ראשי ע' 52]
+  ✓ D35 delay_compensation: 2% מערך התמורה לחודש איחור (עד 60 יום) ואז 2% לשבוע + 50,000 ₪ לחודש  [הסכם קבלן ראשי ע' 51]
+  ∅ D36 fundamental_breach_compensation: 
+  ✓ D37 payment_method: מדידת כמויות  [הסכם קבלן ראשי ע' 4]
+  ✓ D38 partial_account_payment: שוטף+45 ימים מסוף החודש החולף  [הסכם קבלן ראשי ע' 56]
+  ∅ D39 partial_account_submission_date: 
+  ✓ D40 final_account_payment: שוטף+90 ימים  [הסכם קבלן ראשי ע' 58]
+  ✓ D41 indexation: צמוד למדד תשומות הבניה למשרדים ומסחר  [הסכם קבלן ראשי ע' 55]
+  ∅ D42 base_index: 
+  ✓ D43 insurance_note: ביטוחי הקבלן חובה לפני תחילת עבודות, כולל אחריות מקצועית וחבות מוצר  [הסכם קבלן ראשי ע' 40]
+  ∅ D44 advance_payment: 
+  ✓ D45 deductions_retention: 5% עכבון מחשבון ביניים  [הסכם קבלן ראשי ע' 56]
+  ✓ D46 performance_bond: 7.5% מהתמורה  [הסכם קבלן ראשי ע' 70]
+  ✓ D48 warranty_bond: 5% מהתמורה המצטברת בחשבון הסופי  [הסכם קבלן ראשי ע' 71]
+  ✓ D49 warranty_period: 2 שנים לטיח/ריצוף/נגרות; 7 שנים לשלד/חיפויים; 10 שנים לאיטום; 20 שנים לאי-התאמה   [הסכם קבלן ראשי ע' 64]
+  ∅ D50 maintenance_reference: 
+  ∅ D51 warranty_payment: 
+  ∅ D54 daily_works: 
+  ∅ D55 variation_assessment: 
+  ✓ D57 safety_contract_reference: הקבלן הוא מבצע הבניה, חייב בתכנית בטיחות, ממונה בטיחות, מנהל עבודה  [הסכם קבלן ראשי ע' 37]
+  ✓ D58 temporary_traffic_arrangements: הקבלן יכין ויבצע תוכנית הסדרי תנועה זמניים (מהנדס תנועה), תאושר ע"י הרשות; תכלול  [הסכם קבלן ראשי ע' 20]
+  ∅ D59 parking: 
+  ✓ D60 preliminary_site_tests: יש לקרוא סעיף פרקב'–הכנהלביצוע (עמוד 23)  [הסכם קבלן ראשי ע' 23]
+  ✓ D61 site_preparation_works: יש לקרוא סעיף פרקב'–הכנהלביצוע (עמוד 20)  [הסכם קבלן ראשי ע' 20]
+  ∅ D62 permits_fees_payment: 
+  ∅ D63 design_costs_contractor: 
+  ✓ D65 nominated_subcontractors_profit: 12  [הסכם קבלן ראשי]
+  ✓ D66 other_contractors_relation: הקבלן אחראי לתיאום ושילוב עבודת קבלנים אחרים/ספקים, ישתף פעולה, יספק שירותי קבלן  [הסכם קבלן ראשי ע' 46]
+  ✓ D67 main_contractor_services: הקבלן יספק שירותי קבלן ראשי: ביקורת כניסה, שטחי התארגנות, תיאום לו"ז, ניהול ופיק  [הסכם קבלן ראשי ע' 46]
+  ✓ D70 site_conditions: האתר נמסר כבר-רשות בלבד (ניתנת לביטול); הקבלן בדק תוכניות, מפרטים, קרקע, כמויות,  [הסכם קבלן ראשי ע' 14]
+  ✓ D71 fencing_gates: הקבלן יבנה/יתקן גדר היקפית אטומה (מפח איסכורית חדש, צבוע לבן, גובה 2.5 מ' נטו),   [הסכם קבלן ראשי ע' 20]
+  ✓ D72 site_offices: הקבלן יתקין תוך 30 יום משצ"ה משרד מפקח 84 מ"ר לפחות (4 אנשים), ממוזג, מטבחון, שי  [הסכם קבלן ראשי ע' 21]
+  ✓ D73 access_roads: הקבלן יתקין דרכים, רמפות וכבישים ארעיים במקומות שיסומנו בתוכניות, יחזיקם תקינים;  [הסכם קבלן ראשי ע' 20]
+  ✓ D74 signage: הקבלן יתקין שלטים מוארים (4 שלטים של כ-20 מ"ר) תוך 21 יום מצו התחלת עבודה, כולל   [הסכם קבלן ראשי ע' 25]
+  ✓ D75 security: שמירה 24/7 באתר (יום ולילה) ע"י שומרים מורשים עם רישיונות, כולל נעילת אתר, מניעת  [הסכם קבלן ראשי ע' 26]
+  ✓ D76 temporary_water_electricity: חיבור זמני למים וחשמל (לוח תלת-פאזי, מונים, UPS, תאורת התמצאות) תוך 14 יום מצו ה  [הסכם קבלן ראשי ע' 24]
+  ✓ D77 temporary_sewage: מערכת ביוב זמנית (מיכל אגירה ופינוי ביובית) עד לחיבור למערכת העירונית, על חשבון   [הסכם קבלן ראשי ע' 25]
+  ✓ D78 temporary_drainage: מערך ניקוז זמני עם משאבות כפולות ומגובה גנרטור למניעת הצפה, על חשבון הקבלן (סעיף  [הסכם קבלן ראשי ע' 25]
+  ✓ D79 additional_infrastructure: תאורת התמצאות היקפית, לוחות חשמל בטיחותיים בכל קומה, מערכת טמ"ס עם גיבוי ענן, על  [הסכם קבלן ראשי ע' 25]
+  ✓ D80 cleaning: ניקיון יומי של אתר, פינוי פסולת לאתר מורשה, ניקיון לפני מסירה, על חשבון הקבלן (ס  [הסכם קבלן ראשי ע' 52]
+  ✓ D81 project_documentation: תוכניות AS-MADE (DWG+PDF), תיק מתקן מלא, צילום צנרת ביוב, תעודות אחריות (סעיף 50  [הסכם קבלן ראשי ע' 63]
+  ✓ D83 site_team_requirements: צוות ניהול: מהנדס אחראי (10 שנות ניסיון), מהנדס ביצוע, מנהל עבודה רשום, ממונה בט  [הסכם קבלן ראשי ע' 36]
+  ✓ D84 project_management_system: שימוש חובה במערכת SITEAM (או תוכנה אחרת) ל-RFI, Submittals, בקרת איכות, לוחות זמ  [הסכם קבלן ראשי ע' 90]
+  ✓ D85 working_hours: עבודות רק בשעות המותרות על פי דין; הפרה = הפרה יסודית (סעיף 21.19)  [הסכם קבלן ראשי ע' 18]
+  ✓ D86 accompanying_lab: התקשרות עם מעבדה מוסמכת (מכון התקנים או חלופה), בדיקות תקופתיות, תוצאות ישירות ל  [הסכם קבלן ראשי ע' 32]
+  ∅ D88 security_personnel_classification: 
+  ∅ D89 employee_security_classification: 
+  ∅ D90 access_control_requirements: 
+  ∅ D91 worker_escort: 
+  ∅ D92 document_security: 
+  ∅ D93 security_officer: 
+  ✓ D96 systems_coordinator: תיאום מלא של כל המערכות (סופרפוזיציה), פתחים, חריצים, אישור קבלנים אחרים לפני יצ  [הסכם קבלן ראשי ע' 115]
+  ✓ D97 bim_requirement: עדכון מודל BIM (Revit) עם תכניות הקבלן ושינויים, סריקה תלת-מימדית ל-AS MADE (סעי  [הסכם קבלן ראשי ע' 93]
+
+  fields=80 finals=59 withValue=59 filledCells=59

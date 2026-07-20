@@ -13,6 +13,7 @@ import {
   confirmFieldsAction,
   classifyDocumentAction,
   extractEvidenceAction,
+  extractGapEvidenceAction,
   locateJobAction,
   fetchTvaEnrichmentAction,
   fetchDealEnrichmentAction,
@@ -109,6 +110,9 @@ async function uploadFileSmart(
 
 let eventSeq = 0;
 
+/** localStorage key holding the latest job id — survives refresh/HMR reloads. */
+const RESUME_KEY = "omdan.customJobId";
+
 export function CustomJobWizard() {
   const router = useRouter();
   const [phase, setPhase] = React.useState<Phase>("upload");
@@ -137,6 +141,20 @@ export function CustomJobWizard() {
   const docs = files.filter((f) => f.kind === "document");
   const canStart = Boolean(excel) && docs.length > 0;
 
+  // Resume: a refresh mid-flow used to lose everything although the job (and
+  // its results) live in the DB. Offer the last completed job back.
+  const [resume, setResume] = React.useState<CustomJobDTO | null>(null);
+  React.useEffect(() => {
+    const savedId = localStorage.getItem(RESUME_KEY);
+    if (!savedId) return;
+    getCustomJobAction(savedId)
+      .then((res) => {
+        if (res && "job" in res && res.job.results.length > 0) setResume(res.job);
+        else localStorage.removeItem(RESUME_KEY);
+      })
+      .catch(() => null);
+  }, []);
+
   /* ---------------- Phase: upload → analyze excel ---------------- */
   const start = async () => {
     setFatal("");
@@ -156,6 +174,7 @@ export function CustomJobWizard() {
       return;
     }
     setJobId(created.jobId);
+    localStorage.setItem(RESUME_KEY, created.jobId);
 
     // Upload files — chunked automatically when big (Vercel ~4.5MB request cap).
     let uploaded = 0;
@@ -303,11 +322,13 @@ export function CustomJobWizard() {
     if (!jobId) return;
     const enabledDomains =
       domainsArg ?? ([...new Set(fields.filter((f) => f.enabled).map((f) => f.domain))] as FieldDomain[]);
+    const gapDocs = files.filter((f) => f.kind === "document" && f.fileId);
     setPhase("finishing");
     setSteps([
       ...(withTva ? [{ key: "tva", label: 'מייבא תב״ע חיה ממנהל התכנון', state: "active" as const }] : []),
       ...(withDeals ? [{ key: "deals", label: "מאתר עסקאות אמת באזור (סוכן ניווט — כמה דקות)", state: withTva ? ("pending" as const) : ("active" as const) }] : []),
-      { key: "reconcile", label: "מיישב סתירות וקובע ערכים סופיים", state: withTva || withDeals ? "pending" : "active", done: 0, total: enabledDomains.length },
+      { key: "gaps", label: "מעבר השלמה — חילוץ ממוקד לשדות שנותרו ריקים", state: withTva || withDeals ? "pending" : "active", done: 0, total: gapDocs.length },
+      { key: "reconcile", label: "מיישב סתירות וקובע ערכים סופיים", state: "pending", done: 0, total: enabledDomains.length },
     ]);
 
     if (withTva) {
@@ -318,7 +339,7 @@ export function CustomJobWizard() {
         emit("ייבוא התב\"ע נכשל — ממשיכים בלעדיו", "warn");
       }
       patchStep("tva", { state: "done" });
-      patchStep(withDeals ? "deals" : "reconcile", { state: "active" });
+      patchStep(withDeals ? "deals" : "gaps", { state: "active" });
     }
 
     if (withDeals) {
@@ -330,8 +351,30 @@ export function CustomJobWizard() {
         emit("איתור העסקאות נכשל — ממשיכים בלעדיו", "warn");
       }
       patchStep("deals", { state: "done" });
-      patchStep("reconcile", { state: "active" });
+      patchStep("gaps", { state: "active" });
     }
+
+    // Gap pass: fields with zero candidates get one focused retry per document,
+    // then a locator round points at the governing clause for whatever is left.
+    let gapsDone = 0;
+    for (const mode of ["gap", "locate"] as const) {
+      for (const f of gapDocs) {
+        const res = await safe(extractGapEvidenceAction(jobId, f.fileId!, mode));
+        if (mode === "gap") {
+          gapsDone++;
+          patchStep("gaps", { done: gapsDone });
+        }
+        if ("found" in res && res.found > 0) {
+          emit(
+            mode === "gap"
+              ? `מעבר ההשלמה מצא עוד ${res.found} ערכים ב"${f.name}"`
+              : `אותרו ${res.found} סעיפים רלוונטיים לשדות חסרים ב"${f.name}"`,
+          );
+        }
+      }
+    }
+    patchStep("gaps", { state: "done" });
+    patchStep("reconcile", { state: "active" });
 
     let done = 0;
     for (const domain of enabledDomains) {
@@ -369,6 +412,38 @@ export function CustomJobWizard() {
   if (phase === "upload" || phase === "error") {
     return (
       <div className="space-y-4">
+        {resume && (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
+            <p className="min-w-0 flex-1 text-sm">
+              <span className="font-semibold text-[#1E3A5F] dark:text-slate-100">עבודה קודמת שהושלמה:</span>{" "}
+              {resume.name} · {resume.results.length} שדות מולאו
+            </p>
+            <Button
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                setJobId(resume.id);
+                setJob(resume);
+                setResume(null);
+                setPhase("results");
+              }}
+            >
+              <ArrowLeft className="size-3.5" />
+              הצגת התוצאות
+            </Button>
+            <button
+              type="button"
+              aria-label="סגירת הצעת ההמשך"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                localStorage.removeItem(RESUME_KEY);
+                setResume(null);
+              }}
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        )}
         <div className="shadow-pill rounded-xl bg-white p-5 dark:bg-card dark:shadow-none">
           <h2 className="mb-1 text-base font-bold text-[#1E3A5F] dark:text-slate-100">ניתוח מכרז בהתאמה אישית</h2>
           <p className="mb-4 text-sm text-muted-foreground">

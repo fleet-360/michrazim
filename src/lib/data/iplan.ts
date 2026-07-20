@@ -129,6 +129,53 @@ async function queryXplan(params: Record<string, string>): Promise<XplanFeature[
   return json.features;
 }
 
+/**
+ * Approximate WGS84 center of a plan's blue line (bbox center via
+ * returnExtentOnly — cheap even for huge plans). Good enough to anchor a
+ * tender that states a plan number but no gush/helka.
+ */
+export async function fetchPlanCenter(planNumber: string): Promise<{ lat: number; lng: number } | null> {
+  const clean = planNumber.trim();
+  if (!clean) return null;
+  const variants = [...new Set([clean, clean.replace(/\/\s*/g, "/ "), clean.replace(/\/\s+/g, "/")])];
+  for (const v of variants) {
+    const escaped = v.replace(/'/g, "''");
+    const search = new URLSearchParams({
+      f: "json",
+      where: `pl_number='${escaped}'`,
+      returnExtentOnly: "true",
+      outSR: "4326",
+    });
+    const json = await safeJson<{ extent?: { xmin: number; ymin: number; xmax: number; ymax: number } }>(
+      `${XPLAN_QUERY_URL}?${search.toString()}`,
+      { timeoutMs: 9000 },
+    );
+    const e = json?.extent;
+    // ArcGIS signals "no features" with NaN extents.
+    if (e && [e.xmin, e.ymin, e.xmax, e.ymax].every((n) => typeof n === "number" && isFinite(n))) {
+      return { lat: (e.ymin + e.ymax) / 2, lng: (e.xmin + e.xmax) / 2 };
+    }
+  }
+  return null;
+}
+
+/**
+ * Plans matched by NAME keywords (e.g. neighborhood + city). XPlan plan names
+ * follow "מגרש X שכ' <שכונה>, <עיר>" conventions, so an AND of LIKE terms finds
+ * the neighborhood's plans even when a centroid point-query misses them.
+ */
+export async function fetchPlansByName(keywords: string[], limit = 10): Promise<PlanInfo[]> {
+  const terms = keywords.map((k) => k.trim()).filter((k) => k.length >= 2).slice(0, 3);
+  if (!terms.length) return [];
+  const key = `nm:${terms.join("|")}`;
+  if (cache.has(key)) return cache.get(key)!;
+  const where = terms.map((t) => `pl_name LIKE '%${t.replace(/'/g, "''")}%'`).join(" AND ");
+  const features = await queryXplan({ where, resultRecordCount: "40" });
+  const plans = mapAndSortPlans(features, limit);
+  cache.set(key, plans);
+  return plans;
+}
+
 /** All plans (תב"ע) whose blue line covers the given WGS84 point. */
 export async function fetchPlansAtPoint(lat: number, lng: number, limit = 10): Promise<PlanInfo[]> {
   const key = `pt:${lat.toFixed(4)}/${lng.toFixed(4)}`;
@@ -150,8 +197,16 @@ export async function fetchPlansByNumber(planNumber: string): Promise<PlanInfo[]
   if (!clean) return [];
   const key = `pl:${clean}`;
   if (cache.has(key)) return cache.get(key)!;
-  const escaped = clean.replace(/'/g, "''");
-  const features = await queryXplan({ where: `pl_number='${escaped}'` });
+  // XPlan is inconsistent about spacing around the slash — e.g. תמ"ל plans are
+  // stored as "תמל/ 1016" while booklets write "תמל/1016". Try the exact form
+  // first, then the space-after-slash variant.
+  const variants = [...new Set([clean, clean.replace(/\/\s*/g, "/ "), clean.replace(/\/\s+/g, "/")])];
+  let features: XplanFeature[] = [];
+  for (const v of variants) {
+    const escaped = v.replace(/'/g, "''");
+    features = await queryXplan({ where: `pl_number='${escaped}'` });
+    if (features.length) break;
+  }
   const plans = mapAndSortPlans(features, 5);
   cache.set(key, plans);
   return plans;

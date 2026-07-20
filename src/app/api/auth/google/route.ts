@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { googleAuthUrl } from "@/server/google";
+import { googleAuthUrl, publicOrigin } from "@/server/google";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
 
   let authUrl: string;
   try {
-    authUrl = googleAuthUrl({ origin: url.origin, state });
+    authUrl = googleAuthUrl({ origin: publicOrigin(req), state });
   } catch (e) {
     console.error("google auth init failed:", e);
     return NextResponse.redirect(new URL("/login?error=google", url.origin));

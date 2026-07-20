@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { exchangeCode, findOrCreateGoogleUser } from "@/server/google";
+import { exchangeCode, findOrCreateGoogleUser, publicOrigin } from "@/server/google";
 import { createSession } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +21,11 @@ function readCookie(req: Request, name: string): string {
 /** Complete the Google OAuth flow: verify state, exchange code, sign the user in. */
 export async function GET(req: Request) {
   const url = new URL(req.url);
+  // Must match the redirect_uri sent during the auth step AND be the public
+  // https origin — Google validates it on the token exchange (see publicOrigin).
+  const origin = publicOrigin(req);
   const fail = () => {
-    const res = NextResponse.redirect(new URL("/login?error=google", url.origin));
+    const res = NextResponse.redirect(new URL("/login?error=google", origin));
     res.cookies.delete(STATE_COOKIE);
     res.cookies.delete(NEXT_COOKIE);
     return res;
@@ -35,7 +38,7 @@ export async function GET(req: Request) {
   if (!code || !state || !expectedState || state !== expectedState) return fail();
 
   try {
-    const profile = await exchangeCode({ code, origin: url.origin });
+    const profile = await exchangeCode({ code, origin });
     const user = await findOrCreateGoogleUser(profile);
     await createSession(user);
   } catch (e) {
@@ -43,7 +46,7 @@ export async function GET(req: Request) {
     return fail();
   }
 
-  const res = NextResponse.redirect(new URL(safeNext(readCookie(req, NEXT_COOKIE)), url.origin));
+  const res = NextResponse.redirect(new URL(safeNext(readCookie(req, NEXT_COOKIE)), origin));
   res.cookies.delete(STATE_COOKIE);
   res.cookies.delete(NEXT_COOKIE);
   return res;

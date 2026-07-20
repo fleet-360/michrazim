@@ -23,6 +23,23 @@ export function redirectUri(origin: string): string {
   return `${origin}/api/auth/google/callback`;
 }
 
+/**
+ * The public origin of the app, as the browser (and Google) see it.
+ *
+ * Behind Caddy, TLS is terminated at the proxy and the request reaches Next
+ * over plain HTTP, so `new URL(req.url).origin` yields an `http://` scheme —
+ * which Google rejects as a redirect URI for any non-localhost host. Prefer an
+ * explicit override, then the proxy's forwarded headers, then the raw origin.
+ */
+export function publicOrigin(req: Request): string {
+  const configured = process.env.APP_ORIGIN || process.env.NEXT_PUBLIC_APP_ORIGIN;
+  if (configured) return configured.replace(/\/$/, "");
+  const proto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const host = req.headers.get("x-forwarded-host")?.split(",")[0]?.trim() || req.headers.get("host");
+  if (proto && host) return `${proto}://${host}`;
+  return new URL(req.url).origin;
+}
+
 /** Build the Google consent-screen URL for the authorization-code flow. */
 export function googleAuthUrl({ origin, state }: { origin: string; state: string }): string {
   const params = new URLSearchParams({

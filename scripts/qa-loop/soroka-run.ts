@@ -31,6 +31,14 @@ import {
   type DocType,
   type EvidenceCandidate,
 } from "../../src/lib/ai/custom-layers";
+import {
+  classifyCriticality,
+  isMaterialField,
+  criticalityStyle,
+  buildCriticalNote,
+  type Criticality,
+  type Alternative,
+} from "../../src/lib/excel/criticality";
 
 const DL = "C:/Users/myOffice/Downloads";
 const CASES: Record<
@@ -279,6 +287,8 @@ async function main() {
     conflict: boolean;
     conflictNote?: string;
     clarification?: string;
+    criticality?: Criticality;
+    alternatives?: Alternative[];
   };
   let finalsAll = FRESH_EXTRACT ? null : loadJson<Final[]>("finals.json");
   if (!finalsAll) {
@@ -331,6 +341,19 @@ async function main() {
       );
       for (const f of finals ?? []) {
         const chosen = f.sourceIndex !== undefined ? candidates[f.sourceIndex] : undefined;
+        const spec = domFields.find((s) => s.key === f.fieldKey)!;
+        const alternatives: Alternative[] = candidates
+          .filter((c) => c.fieldKey === f.fieldKey && c.index !== f.sourceIndex)
+          .map((c) => ({ value: c.value, sourceLabel: c.sourceLabel, page: c.page }))
+          .slice(0, 4);
+        const criticality = classifyCriticality({
+          spec,
+          value: f.value,
+          hasValue: f.value !== null && f.value !== undefined && f.value !== "",
+          confidence: f.confidence as "high" | "medium" | "low",
+          conflict: f.conflict,
+          alternatives,
+        });
         finalsAll.push({
           fieldKey: f.fieldKey,
           value: f.value,
@@ -341,6 +364,8 @@ async function main() {
           conflict: f.conflict,
           conflictNote: f.conflictNote,
           clarification: chosen?.note,
+          criticality: criticality ?? undefined,
+          alternatives,
         });
       }
     }
@@ -353,11 +378,31 @@ async function main() {
   console.log("\n════════ Phase G: מילוי האקסל ════════");
   const byKey = new Map(fields.map((f) => [f.key, f]));
   const writes: CellWrite[] = [];
+  const handled = new Set<string>();
+  let flaggedCells = 0;
   for (const r of finalsAll) {
     const spec = byKey.get(r.fieldKey);
-    if (!spec || r.value === null || r.value === undefined || r.value === "") continue;
-    writes.push({ sheet: spec.sheet, cellRef: spec.valueCell, value: r.value, dataType: spec.dataType });
-    if (spec.referenceCell && r.source) {
+    if (!spec) continue;
+    handled.add(r.fieldKey);
+    const hasValue = !(r.value === null || r.value === undefined || r.value === "");
+    let note: string | undefined;
+    let fillArgb: string | undefined;
+    if (r.criticality) {
+      note = buildCriticalNote({
+        kind: r.criticality,
+        value: r.value ?? null,
+        hasValue,
+        winnerSource: r.source,
+        page: r.page,
+        alternatives: r.alternatives ?? [],
+        conflictNote: r.conflictNote,
+      });
+      fillArgb = criticalityStyle(r.criticality, hasValue).argb;
+      flaggedCells++;
+    }
+    if (!hasValue && !note) continue;
+    writes.push({ sheet: spec.sheet, cellRef: spec.valueCell, value: hasValue ? r.value : null, dataType: spec.dataType, note, fillArgb });
+    if (hasValue && spec.referenceCell && r.source) {
       const refText = [r.source, r.page ? `עמוד ${r.page}` : undefined].filter(Boolean).join(" — ");
       writes.push({ sheet: spec.sheet, cellRef: spec.referenceCell, value: refText, dataType: "text" });
     }
@@ -366,11 +411,24 @@ async function main() {
       writes.push({ sheet: spec.sheet, cellRef: spec.notesCell, value: noteText, dataType: "text" });
     }
   }
+  // Material fields with no source at all → flag the empty cell.
+  for (const spec of fields) {
+    if (handled.has(spec.key) || !spec.enabled || !isMaterialField(spec)) continue;
+    writes.push({
+      sheet: spec.sheet,
+      cellRef: spec.valueCell,
+      value: null,
+      dataType: spec.dataType,
+      note: buildCriticalNote({ kind: "material_uncertainty", value: null, hasValue: false }),
+      fillArgb: criticalityStyle("material_uncertainty", false).argb,
+    });
+    flaggedCells++;
+  }
   const original = fs.readFileSync(FORMAT_XLSX);
   const { buffer, filled, skipped } = await fillWorkbook(original, writes);
   const outXlsx = path.join(OUT, cfg.outName);
   fs.writeFileSync(outXlsx, buffer);
-  console.log(`  writes: ${writes.length}, filled: ${filled.length}, skipped: ${skipped.length}`);
+  console.log(`  writes: ${writes.length}, filled: ${filled.length}, skipped: ${skipped.length}, flagged: ${flaggedCells}`);
   skipped.slice(0, 10).forEach((s) => console.log(`    skip ${s.cellRef}: ${s.reason}`));
   console.log(`  → ${outXlsx}`);
 

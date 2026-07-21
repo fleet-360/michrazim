@@ -143,6 +143,15 @@ const CustomJobSchema = new Schema(
           conflictNote: String,
           /** Clarification question surfaced by extraction (notes column). */
           clarification: String,
+          /** Why this value is flagged for review; drives the Excel note+fill. */
+          criticality: { type: String, enum: ["conflict", "override", "material_uncertainty"] },
+          /** Non-winning candidates, so the annotation can show both sides. */
+          alternatives: [
+            new Schema(
+              { value: Schema.Types.Mixed, sourceLabel: String, page: Number },
+              { _id: false },
+            ),
+          ],
           userEdited: { type: Boolean, default: false },
           filled: { type: Boolean, default: false },
         },
@@ -174,6 +183,8 @@ const CustomEvidenceSchema = new Schema(
           sourceUrl: String,
           page: Number,
           confidence: { type: String, enum: ["high", "medium", "low"], default: "medium" },
+          /** Clarification/caveat the extraction surfaced (was being dropped). */
+          note: String,
         },
         { _id: false },
       ),

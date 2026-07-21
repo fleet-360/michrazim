@@ -6,7 +6,8 @@
     "quote": "הנדון:בקשה להצעת מחיר לביצוע עבודותקבלן ראשי בפרויקטמרלו\"גH&M",
     "page": 4,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "project_description",
@@ -15,7 +16,8 @@
     "quote": "\"הפרויקט\"-הקמתמרכז לוגיסטילחברתH&Mבשטח של כ-15,000מ\"ר. הפרויקט ממוקם בפארק תעשיותיוניון ניר צבי, מועצה מקומית שדות דן",
     "page": 8,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "client_contact",
@@ -24,7 +26,8 @@
     "quote": "יוניוןפיתוח בע\"מ, ח.פ.515510576 מרחוב יגאל אלון67ת\"א",
     "page": 7,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "supervision_contact",
@@ -33,7 +36,8 @@
     "quote": "\"המפקח\"או \"המנהל\"-חברתוקסמן גרופ)וקסמן גוברין גבע(בע\"מ",
     "page": 8,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "structural_engineer",
@@ -42,7 +46,8 @@
     "quote": "רשימת תוכניות קונסטרוקציה - עפ\"י רשימת תוכניות משרד מכלסון - נחום, בזיו.",
     "page": 144,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "architect",
@@ -51,7 +56,8 @@
     "quote": "רשימת תוכניות אדריכלות - עפ\"י רשימת תוכניות משרד מושלי - אלדר, בזיו.",
     "page": 144,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "mechanical_engineer",
@@ -60,7 +66,8 @@
     "quote": "רשימת תוכניות אינסטלציה - עפ\"י רשימת תוכניות משרד נש מהנדסים, בזיו.",
     "page": 144,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "hvac_engineer",
@@ -69,7 +76,8 @@
     "quote": "רשימת תוכניות מיזוג אויר ואוורור - עפ\"י רשימת תוכניות משרד הררי, בזיו.",
     "page": 144,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "electrical_engineer",
@@ -78,7 +86,8 @@
     "quote": "רשימת תוכניות חשמל - עפ\"י רשימת תוכניות משרד ר. כהן, בזיו.",
     "page": 144,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "elevator_consultant",
@@ -87,7 +96,8 @@
     "quote": "רשימת תוכניות יועץ מעליות - עפ\"י רשימת תוכניות משרד אפיק, בזיו.",
     "page": 144,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "landscape_architect",
@@ -96,7 +106,8 @@
     "quote": "רשימת תוכניות אדר' נוף - עפ״י רשימת תוכניות משרד עומר ינוביץ׳, בזיו",
     "page": 0,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "contractor_classification",
@@ -105,7 +116,8 @@
     "quote": "אישור מאת רשם הקבלנים המעיד על היות המציע קבלן מוכר ורשום אצל רשם בנאיות, הנדסה לעבודות קבלנים רישום חוק פי על הקבלניםהתשכ״ט- 1969עלתקנותיובסיווגג׳5ענף ראשי בניה100",
     "page": 5,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "tender_law_applicability",
@@ -114,7 +126,8 @@
     "quote": "כתב הזמנה זה אינו ולא יתפרש בשום מקרה כעריכת מכרז. ... דיני המכרזים לא יחולו על הזמנה זו",
     "page": 6,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "threshold_conditions",
@@ -123,7 +136,8 @@
     "quote": "אישור מאת רשם הקבלנים ... בסיווגג׳5ענף ראשי בניה100. העתק תעודת התאגדות ... אישור רואה חשבון או עורך דין המעיד על זהות מורשי החתימה",
     "page": 5,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "special_submission_requirements",
@@ -132,7 +146,8 @@
     "quote": "המציע יגיש את הצעתו בהעתק אחד, במעטפה סגורה ... לא יאוחר מיום12/04/2026בשעה12:00. כל מסמכי ההזמנה ימולאו בעט כחול ... ככל ולמציע תהינה הסתייגויות כלשהן ... עליו לצרפן יחד עם מסמכי ההצעה החתומים במסמך נפרד",
     "page": 5,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "performance_bond",
@@ -141,7 +156,8 @@
     "quote": "ערבות בנקאית אוטונומית ... בסךשל _____________₪)_______________שקליםחדשים(המהווה7.5% מהתמורה",
     "page": 70,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "warranty_bond",
@@ -150,7 +166,8 @@
     "quote": "ערבות בנקאית אוטונומית ... בסכוםהמהווה5%בתוספת מע״מ מהתמורה המצטברת בחשבון הסופי",
     "page": 71,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "safety_contract_reference",
@@ -159,7 +176,8 @@
     "quote": "הקבלןמצהיר,כימוכריםוידועיםלוכלהחוקים,התקנותוהדינים,החליםעלהעבודות,ובמיוחד,מבלילגרועמכלליותהאמור,דיניהבטיחות",
     "page": 38,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "temporary_traffic_arrangements",
@@ -168,7 +186,8 @@
     "quote": "במסגרת תוכנית ההתארגנות לעיל, הקבלן יכין תוכנית... של הסדרי תנועה זמניים... תאושר ע\"י הרשות המקומית... תכלול גם פירוט של ההסדרים למניעת נפילה... אספקת כל אביזרי השילוט, התמרור, הצביעה ואביזרי הבטיחות השונים... תשלום בגין הפעלת שוטרים ו/או מאבטחים",
     "page": 77,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "other_contractors_relation",
@@ -177,7 +196,8 @@
     "quote": "הקבלן מתחייב לאפשר ביצוע עבודות מכל מין וסוג שהוא ע\"י קבלנים וספקים אחרים באתר הבנייה... והוא מתחייב לבצע את העבודות נשוא הסכם זה, בתיאום ובאופן שלא יפריע ולא יעכב עבודות המבוצעות על-ידי הקבלנים וספקים האחרים",
     "page": 46,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "main_contractor_services",
@@ -186,7 +206,8 @@
     "quote": "הקבלן מתחייב להעניק לקבלנים ולספקים האחרים... את כל השירותים הנדרשים לביצוע כל העבודות... ביקורת כניסה, אפשרות כניסה לאתר... תיאום העבודות... ניהול ופיקוח... פינוי הפסולת... ניקוי סידור וארגון... אספקת תאורת התמצאות... מתן שירותי הרמה ושינוע... שירותי שמירה... השתתפות במסירת העבודות",
     "page": 47,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "site_preparation_works",
@@ -195,7 +216,8 @@
     "quote": "תוך 14 ימים מיום הוצאת ההוראה להתחלת עבודה ימציא הקבלן למפקח את תכנית ההתארגנות באתר... תכנית ההתארגנות תכלול סימון הגידור... נקודות כניסה... הסדרי תנועה זמניים... מקומות האחסון, משרדי אתר, שירותי עובדים, נקודות הזנת מים וחשמל",
     "page": 22,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "site_conditions",
@@ -204,7 +226,8 @@
     "quote": "הפרויקט ממוקם בפארק תעשיות יוניון ניר צבי, מועצה מקומית שדות דן )לשעבר אתר צינורות המזרח התיכון(. שטח מגרש כ–19,000מ״ר... הקרקע נמסרת לקבלן כבר-רשות בלבד, וזכות השימוש כבר רשות כאמור ניתנת לביטול בכל עת",
     "page": 8,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "fencing_gates",
@@ -213,7 +236,8 @@
     "quote": "מיד עם כניסת הקבלן לאתר... ייבנה ו/או יתקן ויחזק גדר היקפית קיימת ושערים... הגדר תהיה אטומה, מפח איסכורית חדש... גובה של 2.5 מ׳ נטו... השער... ברוחב 6.0 מ׳ כולל מנעול. הקבלן מתחייב לתחזק את הגדר כולה... וימסור אותה למזמין... תקין במצב",
     "page": 20,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "site_offices",
@@ -222,7 +246,8 @@
     "quote": "לא יאוחר מאשר 30 ימים ממועד קבלת צו התחלת העבודה, יתקין הקבלן באתר מבנה... שטחו לא יפחת 84 מ״ר... ריהוט חדש... 4 עמדות מחשוב... 2 מסכי 65 אינץ׳... קו תקשורת... 100/100... נתב... 3 נקודות גישה... יוחלף אחת ל-3 שנים... ניקיון יומי... 6 מקומות חניה",
     "page": 81,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "access_roads",
@@ -231,7 +256,8 @@
     "quote": "על הקבלן להתקין... את כל הדרכים, הרמפות והכבישים הארעיים... הסדרי התנועה... יבוצעו ע״י הקבלן... ימנע הפרעה לתנועה... כל נזק... יתוקן ע״י הקבלן... תנועות... על פני משטחים סלולים... בכלי רכב המצוידים בגלגלים פניאומטיים",
     "page": 21,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "signage",
@@ -240,7 +266,8 @@
     "quote": "הקבלן יבצע ויתקין... תוך 21 ימים... 4 שלטים מוארים... כל שלט יהיה בגודל של כ-20 מ״ר... השלטים יכללו הדמיה... יציב... שלטים מוארים... על העגורן... יוארו במשך כל הלילה... ישא בכל התשלומים... אגרות... ארנונה",
     "page": 25,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "security",
@@ -249,7 +276,8 @@
     "quote": "הקבלן יהיה אחראי... לשמירה... 24 שעות ביממה, 7 ימים בשבוע... שומרים כשירים ומיומנים... ימנע הכנסת/הוצאת חומרים... ללא תעודת משלוח... ימנע מאנשים זרים את אפשרות הכניסה... יהיה אחראי... לכל נזק שייגרם בגין שמירה זו",
     "page": 26,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "temporary_water_electricity",
@@ -258,7 +286,8 @@
     "quote": "הקבלן יהיה האחראי הבלעדי... בחיבור ואספקת חשמל ומים לאתר... יבצע... חיבורי רשת המים ורשת החשמל הזמניים... יישא בכל עלויות החיבור... כל ההוצאות של שימוש במים ו/או בחשמל... יהיו על-חשבון הקבלן",
     "page": 24,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "temporary_sewage",
@@ -267,7 +296,8 @@
     "quote": "הקבלן יהיה אחראי לבצע ולתחזק את מערכת הביוב הזמנית. ככל ולא יתאפשר החיבור למערכת הביוב העירונית, תבוצע מערכת זמנית הכוללת מיכל אגירה ופינוי ע״י ביובית. כל השירותים באתר יחוברו למערכת הביוב הזמנית",
     "page": 80,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "temporary_drainage",
@@ -276,7 +306,8 @@
     "quote": "הקבלן יבצע מערך ניקוז מתאים למניעת הצפה... מערך הניקוז יכלול אמצעי הגנה ופינוי המים וכן מערכת שאיבה מגובה גנרטור, אשר תכלול לכל הפחות צמד משאבות שיגבו אחת את השנייה. הקבלן יתחזק את מערך השאיבה",
     "page": 80,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "additional_infrastructure",
@@ -285,7 +316,8 @@
     "quote": "הקבלן יתקין ויתחזק... מצלמות המכסות את כל אזורי הכניסה והיציאה... 24/7, בגיבוי UPS ויחוברו למערכת הקלטה רציפה... גיבוי בענן לתקופה של 12 חודשים... מערכת לניטור דליפות... WINT... מערכת לניהול בטיחות",
     "page": 80,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "cleaning",
@@ -294,7 +326,8 @@
     "quote": "הקבלן יסלק מעת לעת, במשך כל תקופת העבודות ועד למסירת הפרויקט והעבודות למזמין, לשביעות רצונו, ביוזמתו או על פי הוראות המפקח, ממקום ביצוע העבודה את עודפי החומרים, פסולת המבנה, האשפה והמבנים הארעיים מכל סוג שהוא",
     "page": 52,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "project_documentation",
@@ -303,7 +336,8 @@
     "quote": "הקבלן יכין על חשבונו מסמכי ותכניות עדות (\"AS MADE\"), בפורמט מודפס וחתום ע\"י המפקח והמתכננים הרלוונטים (2 סטים צבעוניים), ובמדיה מגנטית בפורמט פתוח (DWG) ובפורמט המיועד להדפסה (PDF ו\\או PLT)",
     "page": 63,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "site_team_requirements",
@@ -312,7 +346,8 @@
     "quote": "צוות הניהול יכלול לפחות: בא-כוח מוסמך מטעם הקבלן אשר יהיה מהנדס מורשה בעל ניסיון של 10 שנים לפחות (המהנדס האחראי); מהנדס ביצוע בעל ניסיון של 5 שנים; מנהל עבודה רשום במשרד העבודה בעל ניסיון של 10 שנים",
     "page": 36,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "project_management_system",
@@ -321,7 +356,8 @@
     "quote": "בפרויקט יעשה שימוש במערכת SITEAM ו/או תוכנה אחרת לפי קביעת המפקח אשר ישמשו את החברה, המפקח, הקבלן, היועצים, המתכננים וכן גורמים נוספים לניהול ובקרה על הפרויקט",
     "page": 90,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "working_hours",
@@ -330,7 +366,8 @@
     "quote": "כי העבודות יבוצעו אך ורק בשעות עבודה המותרות על-פי הדין. הפרת הוראה זו תהווה הפרה יסודית",
     "page": 18,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "accompanying_lab",
@@ -339,7 +376,8 @@
     "quote": "הקבלן יתקשר לצורך ביצוע העבודות עם מעבדה מוסמכת לצורך ביצוע בדיקות התאמה לתקנים, בחוק ובתקנות התכנון והבניה, בהיתר הבניה, בהנחיות לצורך טופס 4",
     "page": 32,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "systems_coordinator",
@@ -348,7 +386,8 @@
     "quote": "הקבלן יהיה אחראי לתאום כל המערכות, המעברים והפתחים בין כל הקבלנים באתר לרבות הוצאת תוכניות סופרפוזיציה מתואמות",
     "page": 112,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "bim_requirement",
@@ -357,7 +396,8 @@
     "quote": "הקבלן יכין על חשבונו מסמכי ותכניות עדות (\"AS MADE\"), בפורמט מודפס וחתום ע\"י המפקח והמתכננים הרלוונטים (2 סטים צבעוניים), ובמדיה מגנטית בפורמט פתוח (DWG)",
     "page": 63,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "submission_date",
@@ -366,7 +406,8 @@
     "quote": "לא יאוחר מיום12/04/2026בשעה12:00",
     "page": 5,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "execution_duration",
@@ -375,7 +416,8 @@
     "quote": "לוחות זמנים:24חודשי ביצוע",
     "page": 105,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "milestone_schedule",
@@ -384,7 +426,8 @@
     "quote": "נספח ב'-לוח זמניםשלדיושלביביצוע; בתוך35ימים... לוח זמנים מפורט... אבני הדרך החוזיות",
     "page": 49,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "external_schedule_management",
@@ -393,7 +436,8 @@
     "quote": "בתוך35ימים ממועד חתימת הסכם זה, ימציא הקבלן לאישור המפקח לוח זמנים מפורט )תרשים גנט ממוחשב(",
     "page": 49,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "partial_account_submission_date",
@@ -402,7 +446,8 @@
     "quote": "בסיום כלחודשיגיש הקבלן חשבון ערוך לפי הוראותיו של המזמין",
     "page": 56,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "warranty_period",
@@ -411,7 +456,8 @@
     "quote": "תקופתהבדק... תהיה תקופת הבדק לרבות בדיקות ותיקונים-3שנים... תקופתהאחריות... שלוש)3(שנים נוספות",
     "page": 64,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "price_uniformity",
@@ -420,7 +466,8 @@
     "quote": "בכל מקרה שישנם בכתב הכמויות סעיפים זהים והמציע ימלא מחירים שונים לסעיפים אלו, יראו כאילו המחיר שהציע הקבלן לבצע את העבודה נשוא הסעיף על פי המחיר הנמוך מבין שני המחירים שננקבו על ידי הקבלן",
     "page": 6,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "general_penalties",
@@ -429,7 +476,8 @@
     "quote": "הקבלן ישלם למזמין, סך של 5,000 ₪... בגין כל אירוע של הפרת הבטיחות",
     "page": 51,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "delay_compensation",
@@ -438,7 +486,8 @@
     "quote": "2% מערך התמורה בגין כל חודש איחור... עד 60 ימים... 2% לשבוע... 50,000 ₪... בגין הוצאות ניהול ופיקוח",
     "page": 51,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "payment_method",
@@ -447,7 +496,8 @@
     "quote": "בשיטת מדידת כמויות, כמפורט במסמכי ההזמנה",
     "page": 4,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "partial_account_payment",
@@ -456,7 +506,8 @@
     "quote": "ישלם המזמין לקבלן את סכום החשבון המאושר תוך 45 ימים מסוף החודש החולף",
     "page": 56,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "final_account_payment",
@@ -465,7 +516,8 @@
     "quote": "החשבון הסופי ישולם לקבלן בתנאים של שוטף + 90 ימים",
     "page": 58,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "indexation",
@@ -474,7 +526,8 @@
     "quote": "תשלומי התמורה יהיו צמודים למדד תשומות הבניה למשרדים ומסחר",
     "page": 55,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "base_index",
@@ -483,7 +536,8 @@
     "quote": "מדד הבסיס - המדד הידוע ביום בו יקבל הקבלן הודעת זכייה",
     "page": 55,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "deductions_retention",
@@ -492,7 +546,8 @@
     "quote": "המזמין יקזז מכל חשבון ביניים סך של 5% מהסכום הנקוב בחשבון הביניים כדמי עיכבון",
     "page": 56,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "variation_assessment",
@@ -501,7 +556,8 @@
     "quote": "התשלום יתבצע לפי מדידה בפועל של השינויים... לא נקבעו סעיפים מתאימים... יחושב סכום השינוי לפי מחירי מחירון דקל... בהעדר יחידות מתאימות... עלות הישירה בפועל... בתוספת 12% בגין תקורה ורווח",
     "page": 60,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "permits_fees_payment",
@@ -510,7 +566,8 @@
     "quote": "הקבלן אחראי באופן בלעדי, על חשבונו להוצאת כל הרישיונות ו/או האישורים ו/או ההיתרים הדרושים... ותשלום כל התשלומים והמיסים וההיטלים בגינם",
     "page": 20,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "design_costs_contractor",
@@ -519,7 +576,8 @@
     "quote": "על הקבלן להכין תוכניות ייצור... על חשבונו; כל ההוצאות לתכנון תוכניות הקבלן כלולות בתמורה",
     "page": 44,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   },
   {
     "fieldKey": "nominated_subcontractors_profit",
@@ -528,6 +586,7 @@
     "quote": "בנוסף למחיר שיסוכם עם קבלן המשנה, הקבלן הראשי יהיה זכאי לתוספת 12% עבור הוצאות תקורה ורווח... 6% עבור הוצאות תקורה ורווח",
     "page": 60,
     "confidence": "high",
-    "conflict": false
+    "conflict": false,
+    "alternatives": []
   }
 ]

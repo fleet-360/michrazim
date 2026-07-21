@@ -19,6 +19,14 @@ import {
 } from "@/lib/excel/serialize";
 import { fillWorkbook, type CellWrite } from "@/lib/excel/fill";
 import {
+  classifyCriticality,
+  isMaterialField,
+  criticalityStyle,
+  buildCriticalNote,
+  type Criticality,
+  type Alternative,
+} from "@/lib/excel/criticality";
+import {
   analyzeSheetFields,
   classifyDocument,
   extractDomainEvidence,
@@ -70,6 +78,8 @@ export interface JobResultDTO {
   conflict: boolean;
   conflictNote?: string;
   clarification?: string;
+  criticality?: Criticality;
+  alternatives?: Alternative[];
   userEdited: boolean;
 }
 
@@ -183,6 +193,12 @@ function toJobDTO(
         conflict: Boolean(r.conflict),
         conflictNote: r.conflictNote,
         clarification: r.clarification,
+        criticality: r.criticality,
+        alternatives: (r.alternatives ?? []).map((a: any) => ({
+          value: a.value ?? null,
+          sourceLabel: a.sourceLabel,
+          page: a.page,
+        })),
         userEdited: Boolean(r.userEdited),
       } satisfies JobResultDTO;
     })
@@ -982,6 +998,21 @@ export async function reconcileDomainAction(
         for (const f of finals) {
           const chosen = f.sourceIndex !== undefined ? candidates[f.sourceIndex] : undefined;
           const spec = fields.find((s) => s.key === f.fieldKey)!;
+          // Non-winning candidates for this field — so the annotation can show
+          // both sides, and a silent "specific beats generic" pick surfaces as
+          // an `override` even when reconcile set conflict:false.
+          const alternatives = candidates
+            .filter((c) => c.fieldKey === f.fieldKey && c.index !== f.sourceIndex)
+            .map((c) => ({ value: c.value, sourceLabel: c.sourceLabel, page: c.page }))
+            .slice(0, 4);
+          const criticality = classifyCriticality({
+            spec,
+            value: f.value,
+            hasValue: f.value !== null && f.value !== undefined && f.value !== "",
+            confidence: f.confidence,
+            conflict: f.conflict,
+            alternatives,
+          });
           results.push({
             fieldKey: f.fieldKey,
             value: f.value,
@@ -998,6 +1029,8 @@ export async function reconcileDomainAction(
             conflict: f.conflict,
             conflictNote: f.conflictNote,
             clarification: chosen?.note,
+            criticality: criticality ?? undefined,
+            alternatives,
             userEdited: false,
             filled: false,
           });
@@ -1051,7 +1084,9 @@ export async function updateFinalValueAction(
 export async function fillExcelAction(
   jobId: string,
 ): Promise<
-  { fileId: string; filename: string; filled: number; skipped: { cellRef: string; reason: string }[] } | AuthFail | Err
+  | { fileId: string; filename: string; filled: number; skipped: { cellRef: string; reason: string }[]; flagged: number }
+  | AuthFail
+  | Err
 > {
   const owned = await ownedJob(jobId);
   if (owned.fail) return owned.fail;
@@ -1079,12 +1114,48 @@ export async function fillExcelAction(
       docFiles.map((f: any) => [String(f._id), shortDocName(String(f.filename))]),
     );
 
+    const winnerSourceName = (r: any): string | undefined =>
+      r.source?.kind === "xplan"
+        ? 'תב"ע חיה'
+        : r.source?.fileId
+          ? docNameById.get(String(r.source.fileId))
+          : undefined;
+
     const writes: CellWrite[] = [];
+    const handled = new Set<string>();
+    let flaggedCells = 0;
     for (const r of owned.job.results ?? []) {
       const spec = byKey.get(r.fieldKey);
-      if (!spec || r.value === null || r.value === undefined || r.value === "") continue;
-      writes.push({ sheet: spec.sheet, cellRef: spec.valueCell, value: r.value, dataType: spec.dataType });
-      if (spec.referenceCell && r.source?.kind === "document") {
+      if (!spec) continue;
+      handled.add(r.fieldKey);
+      const hasValue = !(r.value === null || r.value === undefined || r.value === "");
+      // A resolved value is flagged only if it wasn't manually reviewed.
+      const kind: Criticality | undefined = r.userEdited ? undefined : (r.criticality as Criticality | undefined);
+      let note: string | undefined;
+      let fillArgb: string | undefined;
+      if (kind) {
+        note = buildCriticalNote({
+          kind,
+          value: r.value ?? null,
+          hasValue,
+          winnerSource: winnerSourceName(r),
+          page: r.source?.page,
+          alternatives: (r.alternatives ?? []) as Alternative[],
+          conflictNote: r.conflictNote,
+        });
+        fillArgb = criticalityStyle(kind, hasValue).argb;
+        flaggedCells++;
+      }
+      if (!hasValue && !note) continue; // nothing to write or flag
+      writes.push({
+        sheet: spec.sheet,
+        cellRef: spec.valueCell,
+        value: hasValue ? r.value : null,
+        dataType: spec.dataType,
+        note,
+        fillArgb,
+      });
+      if (hasValue && spec.referenceCell && r.source?.kind === "document") {
         const docName = r.source.fileId ? docNameById.get(String(r.source.fileId)) : undefined;
         const refText = [docName, r.source.page ? `עמוד ${r.source.page}` : undefined]
           .filter(Boolean)
@@ -1097,6 +1168,22 @@ export async function fillExcelAction(
       if (spec.notesCell && noteText) {
         writes.push({ sheet: spec.sheet, cellRef: spec.notesCell, value: noteText, dataType: "text" });
       }
+    }
+
+    // Material fields the format expects but no source produced anything for —
+    // a money/safety gap. Flag the (empty) value cell red instead of leaving it
+    // silently blank. Non-material blanks are left alone (no noise).
+    for (const spec of fields) {
+      if (handled.has(spec.key) || !isMaterialField(spec)) continue;
+      writes.push({
+        sheet: spec.sheet,
+        cellRef: spec.valueCell,
+        value: null,
+        dataType: spec.dataType,
+        note: buildCriticalNote({ kind: "material_uncertainty", value: null, hasValue: false }),
+        fillArgb: criticalityStyle("material_uncertainty", false).argb,
+      });
+      flaggedCells++;
     }
     if (!writes.length) return { error: "אין ערכים למילוי" };
 
@@ -1126,7 +1213,7 @@ export async function fillExcelAction(
 
     // The bytes are NOT returned through the action (Vercel caps responses at
     // ~4.5MB) — the client downloads via /api/custom/files/[id].
-    return { fileId: String(resultFile._id), filename: outName, filled: filled.length, skipped };
+    return { fileId: String(resultFile._id), filename: outName, filled: filled.length, skipped, flagged: flaggedCells };
   } catch (e) {
     console.error("fillExcelAction failed:", e);
     return { error: "מילוי האקסל נכשל" };

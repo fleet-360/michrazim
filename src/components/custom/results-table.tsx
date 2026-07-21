@@ -27,7 +27,7 @@ export function ResultsTable({ job, onJobUpdated }: { job: CustomJobDTO; onJobUp
   const [draft, setDraft] = React.useState("");
   const [savingKey, setSavingKey] = React.useState<string | null>(null);
   const [downloading, setDownloading] = React.useState(false);
-  const [downloadInfo, setDownloadInfo] = React.useState<{ filled: number; skipped: number } | null>(null);
+  const [downloadInfo, setDownloadInfo] = React.useState<{ filled: number; skipped: number; flagged: number } | null>(null);
   const [error, setError] = React.useState("");
   const [local, setLocal] = React.useState<Map<string, string>>(new Map());
 
@@ -38,6 +38,9 @@ export function ResultsTable({ job, onJobUpdated }: { job: CustomJobDTO; onJobUp
     return !r || r.value === null || r.value === "";
   });
   const conflicts = job.results.filter((r) => r.conflict).length;
+  // "Critical for review" = every flagged item (conflicts, silent overrides,
+  // material uncertainty) — the things that must never be resolved silently.
+  const critical = job.results.filter((r) => r.criticality && !r.userEdited).length;
   const sourceCount = new Set(
     job.results.filter((r) => r.sourceName).map((r) => r.sourceName),
   ).size;
@@ -71,7 +74,7 @@ export function ResultsTable({ job, onJobUpdated }: { job: CustomJobDTO; onJobUp
       a.href = `/api/custom/files/${res.fileId}`;
       a.download = res.filename;
       a.click();
-      setDownloadInfo({ filled: res.filled, skipped: res.skipped.length });
+      setDownloadInfo({ filled: res.filled, skipped: res.skipped.length, flagged: res.flagged });
       onJobUpdated?.();
     }
     setDownloading(false);
@@ -112,9 +115,9 @@ export function ResultsTable({ job, onJobUpdated }: { job: CustomJobDTO; onJobUp
           <span className="rounded-full bg-success/10 px-2.5 py-1 text-success tnum">
             {highConf} בביטחון גבוה
           </span>
-          {conflicts > 0 && (
-            <span className="rounded-full bg-warning/10 px-2.5 py-1 text-warning-foreground tnum dark:text-amber-300">
-              {conflicts} סתירות לבדיקה
+          {critical > 0 && (
+            <span className="rounded-full bg-warning/10 px-2.5 py-1 font-semibold text-warning-foreground tnum dark:text-amber-300">
+              {critical} פריטים קריטיים לבדיקה
             </span>
           )}
         </div>
@@ -123,6 +126,7 @@ export function ResultsTable({ job, onJobUpdated }: { job: CustomJobDTO; onJobUp
           <p className="mb-3 flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-success/10 px-3 py-2 text-xs text-success">
             <CheckCircle2 className="size-3.5" />
             נכתבו {downloadInfo.filled} תאים לקובץ המקורי שלכם (העיצוב נשמר)
+            {downloadInfo.flagged > 0 && ` · ${downloadInfo.flagged} תאים סומנו לבדיקה (הערה + צבע בקובץ)`}
             {downloadInfo.skipped > 0 && ` · ${downloadInfo.skipped} תאים דולגו (נוסחאות/חסרים)`}
           </p>
         )}
@@ -138,7 +142,7 @@ export function ResultsTable({ job, onJobUpdated }: { job: CustomJobDTO; onJobUp
                     key={r.fieldKey}
                     className={cn(
                       "flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-border px-2.5 py-1.5",
-                      r.conflict && "border-warning/60 bg-warning/10",
+                      r.criticality && !r.userEdited && "border-warning/60 bg-warning/10",
                     )}
                   >
                     <span className="min-w-0 flex-1 truncate text-sm">{r.label}</span>
@@ -177,13 +181,28 @@ export function ResultsTable({ job, onJobUpdated }: { job: CustomJobDTO; onJobUp
                       )}
                       title={r.userEdited ? "נערך ידנית" : `ביטחון: ${r.confidence ?? "—"}`}
                     />
-                    {r.conflict && r.conflictNote && (
+                    {r.criticality && !r.userEdited && (
                       <p className="flex w-full items-start gap-1 text-xs text-warning-foreground dark:text-amber-300">
                         <AlertTriangle className="mt-0.5 size-3 shrink-0" />
-                        {r.conflictNote}
+                        <span>
+                          {r.criticality === "conflict"
+                            ? "סתירה בין מקורות"
+                            : r.criticality === "override"
+                              ? "מקור ספציפי גובר על כללי"
+                              : "אי-ודאות מהותית (כסף/בטיחות)"}
+                          {r.conflictNote ? ` — ${r.conflictNote}` : ""}
+                          {r.alternatives && r.alternatives.length > 0 && (
+                            <span className="text-muted-foreground">
+                              {" · מקור אחר: "}
+                              {r.alternatives
+                                .map((a) => `${a.value ?? "—"}${a.sourceLabel ? ` (${a.sourceLabel})` : ""}`)
+                                .join(" · ")}
+                            </span>
+                          )}
+                        </span>
                       </p>
                     )}
-                    {!r.conflict && r.clarification && (
+                    {r.clarification && (
                       <p className="flex w-full items-start gap-1 text-xs text-muted-foreground">
                         <AlertTriangle className="mt-0.5 size-3 shrink-0 opacity-60" />
                         שאלת הבהרה: {r.clarification}

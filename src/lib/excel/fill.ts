@@ -14,6 +14,10 @@ export interface CellWrite {
   cellRef: string;
   value: string | number | boolean | null;
   dataType: FieldDataType;
+  /** Optional Excel hover-comment to attach to the cell (criticality flag). */
+  note?: string;
+  /** Optional solid fill ARGB (e.g. "FFFFE9A8") to highlight the cell. */
+  fillArgb?: string;
 }
 
 export interface FillResult {
@@ -96,18 +100,34 @@ export async function fillWorkbook(originalXlsx: Buffer, writes: CellWrite[]): P
       skipped.push({ cellRef: label, reason: "תא נוסחה — שדה מחושב, לא נכתב" });
       continue;
     }
-    if (w.value === null || w.value === undefined || w.value === "") {
+    const hasValue = !(w.value === null || w.value === undefined || w.value === "");
+    if (hasValue) {
+      const coerced = coerce(w.value, w.dataType, (cell.numFmt ?? "").toString());
+      cell.value = coerced;
+      // A Date written into a General-format cell renders as a raw serial
+      // number (e.g. 46124) — give it a date format. Via a fresh style object
+      // to avoid mutating exceljs's shared default style (see fill note below).
+      if (coerced instanceof Date && !/[dmy]/i.test((cell.numFmt ?? "").toString())) {
+        cell.style = { ...cell.style, numFmt: "dd/mm/yyyy" };
+      }
+      filled.push(label);
+    } else if (!w.note && !w.fillArgb) {
+      // No value AND no annotation — nothing to do.
       skipped.push({ cellRef: label, reason: "אין ערך למילוי" });
       continue;
     }
-    const coerced = coerce(w.value, w.dataType, (cell.numFmt ?? "").toString());
-    cell.value = coerced;
-    // A Date written into a General-format cell renders as a raw serial
-    // number (e.g. 46124) — give it a date format.
-    if (coerced instanceof Date && !/[dmy]/i.test((cell.numFmt ?? "").toString())) {
-      cell.numFmt = "dd/mm/yyyy";
+    // Criticality annotations (apply on both filled and value-less flagged
+    // cells). exceljs shares one style object across all default-styled cells,
+    // so assigning `cell.fill` directly mutates that shared object and bleeds
+    // the color to every other cell. Spreading into a fresh per-cell style
+    // object isolates the change to this cell only.
+    if (w.fillArgb) {
+      cell.style = {
+        ...cell.style,
+        fill: { type: "pattern", pattern: "solid", fgColor: { argb: w.fillArgb } },
+      };
     }
-    filled.push(label);
+    if (w.note) cell.note = w.note;
   }
 
   const out = await wb.xlsx.writeBuffer();

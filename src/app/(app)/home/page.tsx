@@ -7,6 +7,8 @@ import { type ProjectCardData } from "@/components/common/project-card";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  console.log("Home page loaded");
+
   const [projects, cities] = await Promise.all([getProjects(), getCities()]);
 
   // getProjects() is sorted most-recent-first; the landing shows only a few.
